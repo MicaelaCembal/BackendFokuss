@@ -74,6 +74,24 @@ router.delete("/:id", async (req, res) => {
 
 	try {
 
+		const tarea = await Tarea.findById(req.params.id);
+
+		if (!tarea) {
+
+			return res.status(404).json({
+				mensaje: "Tarea no encontrada",
+			});
+
+		}
+
+		if (!tarea.es_evento) {
+
+			return res.status(400).json({
+				mensaje: "Solo se pueden eliminar eventos del calendario desde esta ruta",
+			});
+
+		}
+
 		await Tarea.findByIdAndDelete(req.params.id);
 
 		res.json({
@@ -94,13 +112,40 @@ router.put("/:id", async (req, res) => {
 
 	try {
 
-		const tareaActualizada = await Tarea.findByIdAndUpdate(
-			req.params.id,
-			req.body,
-			{
-				new: true,
-			}
-		);
+		const tarea = await Tarea.findById(req.params.id);
+
+		if (!tarea) {
+
+			return res.status(404).json({
+				mensaje: "Tarea no encontrada",
+			});
+
+		}
+
+		if (!tarea.es_evento) {
+
+			return res.status(400).json({
+				mensaje: "Solo se pueden editar eventos del calendario desde esta ruta",
+			});
+
+		}
+
+		tarea.usuario_id = req.body.usuario_id ?? tarea.usuario_id;
+		tarea.titulo = req.body.titulo ?? tarea.titulo;
+		tarea.descripcion = req.body.descripcion ?? tarea.descripcion;
+		tarea.tipo = req.body.tipo ?? tarea.tipo;
+		tarea.materia = req.body.materia ?? tarea.materia;
+		tarea.prioridad = req.body.prioridad ?? tarea.prioridad;
+		tarea.estado = req.body.estado ?? tarea.estado;
+		tarea.fecha_vencimiento = req.body.fecha_vencimiento ?? tarea.fecha_vencimiento;
+		tarea.hora_inicio = req.body.hora_inicio ?? tarea.hora_inicio;
+		tarea.hora_fin = req.body.hora_fin ?? tarea.hora_fin;
+		tarea.es_evento = typeof req.body.es_evento === "boolean" ? req.body.es_evento : tarea.es_evento;
+		tarea.recordatorio = typeof req.body.recordatorio === "boolean" ? req.body.recordatorio : tarea.recordatorio;
+		tarea.repetir = req.body.repetir ?? tarea.repetir;
+		tarea.notas = req.body.notas ?? tarea.notas;
+
+		const tareaActualizada = await tarea.save();
 
 		res.json(tareaActualizada);
 
