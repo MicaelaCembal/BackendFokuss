@@ -14,6 +14,8 @@ const flashcardsRoutes = require("./routes/flashcards");
 
 const pomodoroRoutes = require("./routes/pomodoro");
 
+const amigosRoutes = require("./routes/amigos");
+
 const app = express();
 
 app.use(cors());
@@ -36,6 +38,8 @@ app.use("/api/tareas", tareasRoutes);
 app.use("/api/flashcards", flashcardsRoutes);
 
 app.use("/api/pomodoro", pomodoroRoutes);
+
+app.use("/api/amigos", amigosRoutes);
 
 const mongoURI = process.env.MONGODB_URI;
 
