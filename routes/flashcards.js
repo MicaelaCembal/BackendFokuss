@@ -169,6 +169,13 @@ router.post(
 	upload.single("imagen"),
 	async (req, res) => {
 
+		console.log("BODY:");
+		console.log(req.body);
+
+		console.log("FILE:");
+		console.log(req.file);
+
+
 		try {
 
 			if (!req.file) {
@@ -341,7 +348,8 @@ Devuelve SOLO JSON.
 
 		}
 
-	}
+		}
+
 );
 
 router.post(
