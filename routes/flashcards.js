@@ -283,4 +283,20 @@ Devuelve SOLO JSON.
 	}
 );
 
+router.post(
+	"/test-imagen",
+	upload.single("imagen"),
+	(req, res) => {
+
+		console.log("ENTRO");
+
+		res.json({
+			ok: true,
+			body: req.body,
+			file: req.file ? true : false
+		});
+
+	}
+);
+
 module.exports = router;
