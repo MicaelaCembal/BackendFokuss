@@ -10,6 +10,12 @@ const ai = new GoogleGenAI({
 	apiKey: process.env.GEMINI_API_KEY
 });
 
+const multer = require("multer");
+
+const upload = multer({
+	storage: multer.memoryStorage()
+});
+
 console.log("GEMINI:", process.env.GEMINI_API_KEY);
 
 router.post("/", async (req, res) => {
@@ -157,5 +163,121 @@ ${texto}
 	}
 
 });
+
+router.post(
+	"/generar-imagen",
+	upload.single("imagen"),
+	async (req, res) => {
+
+		try {
+
+			const {
+				usuario_id,
+				materia
+			} = req.body;
+
+			const imagenBase64 =
+				req.file.buffer.toString("base64");
+
+			const prompt = `
+Analiza la imagen.
+
+Extrae los conceptos importantes.
+
+Genera flashcards de estudio.
+
+Devuelve SOLO JSON.
+
+[
+	{
+		"pregunta":"...",
+		"respuesta":"..."
+	}
+]
+`;
+
+			const response =
+				await ai.models.generateContent({
+
+					model: "gemini-2.5-flash",
+
+					contents: [
+						{
+							text: prompt
+						},
+						{
+							inlineData: {
+								mimeType: req.file.mimetype,
+								data: imagenBase64
+							}
+						}
+					]
+				});
+
+			let resultado = response.text;
+
+			resultado = resultado
+				.replace(/```json/g, "")
+				.replace(/```/g, "")
+				.trim();
+
+			const cards =
+				JSON.parse(resultado);
+
+			const flashcardsGuardadas = [];
+
+			for (const card of cards) {
+
+				const nuevaFlashcard =
+					new Flashcard({
+
+						usuario_id,
+
+						materia,
+
+						pregunta:
+							card.pregunta,
+
+						respuesta:
+							card.respuesta
+
+					});
+
+				await nuevaFlashcard.save();
+
+				flashcardsGuardadas.push(
+					nuevaFlashcard
+				);
+
+			}
+
+			res.json({
+
+				success: true,
+
+				total:
+					flashcardsGuardadas.length,
+
+				flashcards:
+					flashcardsGuardadas
+
+			});
+
+		} catch (error) {
+
+			console.log(error);
+
+			res.status(500).json({
+
+				success: false,
+
+				error: error.message
+
+			});
+
+		}
+
+	}
+);
 
 module.exports = router;
