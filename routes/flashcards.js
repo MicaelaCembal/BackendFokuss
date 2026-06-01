@@ -4,6 +4,12 @@ const router = express.Router();
 
 const Flashcard = require("../models/Flashcard");
 
+const { GoogleGenAI } = require("@google/genai");
+
+const ai = new GoogleGenAI({
+	apiKey: process.env.GEMINI_API_KEY
+});
+
 router.post("/", async (req, res) => {
 
     try {
@@ -57,6 +63,96 @@ router.delete("/:id", async (req, res) => {
         res.status(500).json(error);
 
     }
+
+});
+
+router.post("/generar", async (req, res) => {
+
+	try {
+
+		const {
+			usuario_id,
+			materia,
+			texto
+		} = req.body;
+
+		const prompt = `
+Generá flashcards de estudio.
+
+Respondé únicamente JSON.
+
+Formato:
+
+[
+	{
+		"pregunta":"...",
+		"respuesta":"..."
+	}
+]
+
+Texto:
+
+${texto}
+`;
+
+		const response = await ai.models.generateContent({
+			model: "gemini-2.5-flash",
+			contents: prompt
+		});
+
+		let resultado = response.text;
+
+		resultado = resultado
+			.replace(/```json/g, "")
+			.replace(/```/g, "")
+			.trim();
+
+		const cards = JSON.parse(resultado);
+
+		const flashcardsGuardadas = [];
+
+		for (const card of cards) {
+
+			const nuevaFlashcard = new Flashcard({
+
+				usuario_id,
+
+				materia,
+
+				pregunta: card.pregunta,
+
+				respuesta: card.respuesta
+
+			});
+
+			await nuevaFlashcard.save();
+
+			flashcardsGuardadas.push(
+				nuevaFlashcard
+			);
+
+		}
+
+		res.json({
+
+			success: true,
+
+			total: flashcardsGuardadas.length,
+
+			flashcards: flashcardsGuardadas
+
+		});
+
+	} catch (error) {
+
+		console.log(error);
+
+		res.status(500).json({
+			success: false,
+			error: error.message
+		});
+
+	}
 
 });
 
