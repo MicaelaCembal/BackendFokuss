@@ -20,6 +20,15 @@ app.use(cors());
 
 app.use(express.json());
 
+app.use((req, res, next) => {
+
+	console.log("CONTENT TYPE:");
+	console.log(req.headers["content-type"]);
+
+	next();
+
+});
+
 app.use('/api/auth', authRoutes);
 
 app.use("/api/tareas", tareasRoutes);
