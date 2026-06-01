@@ -10,6 +10,10 @@ const tareasRoutes = require("./routes/tareas");
 
 const authRoutes = require('./routes/auth');
 
+const flashcardsRoutes = require("./routes/flashcards");
+
+const pomodoroRoutes = require("./routes/pomodoro");
+
 const app = express();
 
 app.use(cors());
@@ -19,6 +23,10 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 
 app.use("/api/tareas", tareasRoutes);
+
+app.use("/api/flashcards", flashcardsRoutes);
+
+app.use("/api/pomodoro", pomodoroRoutes);
 
 const mongoURI = process.env.MONGODB_URI;
 
