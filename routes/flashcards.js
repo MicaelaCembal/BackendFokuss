@@ -10,6 +10,8 @@ const ai = new GoogleGenAI({
 	apiKey: process.env.GEMINI_API_KEY
 });
 
+console.log("GEMINI:", process.env.GEMINI_API_KEY);
+
 router.post("/", async (req, res) => {
 
     try {
