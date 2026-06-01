@@ -205,31 +205,69 @@ Devuelve SOLO JSON.
 ]
 `;
 
-			const response =
-				await ai.models.generateContent({
+			let response;
 
-					model: "gemini-2.5-flash",
+			try {
 
-					contents: [
-						{
-							role: "user",
-							parts: [
-								{
-									text: prompt
-								},
-								{
-									inlineData: {
-										mimeType:
-											req.file.mimetype,
-										data:
-											imagenBase64
+				response =
+					await ai.models.generateContent({
+
+						model: "gemini-2.5-flash",
+
+						contents: [
+							{
+								role: "user",
+								parts: [
+									{
+										text: prompt
+									},
+									{
+										inlineData: {
+											mimeType:
+												req.file.mimetype,
+											data:
+												imagenBase64
+										}
 									}
-								}
-							]
-						}
-					]
+								]
+							}
+						]
 
-				});
+					});
+
+			} catch (error) {
+
+				console.log(
+					"Gemini 2.5 ocupado, usando Gemini 2.0..."
+				);
+
+				response =
+					await ai.models.generateContent({
+
+						model: "gemini-2.0-flash",
+
+						contents: [
+							{
+								role: "user",
+								parts: [
+									{
+										text: prompt
+									},
+									{
+										inlineData: {
+											mimeType:
+												req.file.mimetype,
+											data:
+												imagenBase64
+										}
+									}
+								]
+							}
+						]
+
+					});
+
+			}
 
 			let resultado =
 				response.text;
@@ -283,7 +321,9 @@ Devuelve SOLO JSON.
 
 		} catch (error) {
 
-			console.log("ERROR GEMINI:");
+			console.log(
+				"ERROR GENERAR IMAGEN:"
+			);
 
 			console.log(error);
 
