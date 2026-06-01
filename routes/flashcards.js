@@ -169,25 +169,137 @@ router.post(
 	upload.single("imagen"),
 	async (req, res) => {
 
-		console.log("BODY:");
-		console.log(req.body);
+		try {
 
-		console.log("FILE:");
-		console.log(req.file);
+			if (!req.file) {
 
-		if (!req.file) {
+				return res.status(400).json({
+					success: false,
+					error: "No llegó ninguna imagen"
+				});
 
-			return res.status(400).json({
-				error: "No llegó ninguna imagen"
+			}
+
+			const {
+				usuario_id,
+				materia
+			} = req.body;
+
+			const imagenBase64 =
+				req.file.buffer.toString("base64");
+
+			const prompt = `
+Analiza la imagen.
+
+Extrae toda la información importante.
+
+Genera flashcards de estudio.
+
+Devuelve SOLO JSON.
+
+[
+	{
+		"pregunta":"...",
+		"respuesta":"..."
+	}
+]
+`;
+
+			const response =
+				await ai.models.generateContent({
+
+					model: "gemini-2.5-flash",
+
+					contents: [
+						{
+							role: "user",
+							parts: [
+								{
+									text: prompt
+								},
+								{
+									inlineData: {
+										mimeType:
+											req.file.mimetype,
+										data:
+											imagenBase64
+									}
+								}
+							]
+						}
+					]
+
+				});
+
+			let resultado =
+				response.text;
+
+			resultado = resultado
+				.replace(/```json/g, "")
+				.replace(/```/g, "")
+				.trim();
+
+			const cards =
+				JSON.parse(resultado);
+
+			const flashcardsGuardadas = [];
+
+			for (const card of cards) {
+
+				const nuevaFlashcard =
+					new Flashcard({
+
+						usuario_id,
+
+						materia,
+
+						pregunta:
+							card.pregunta,
+
+						respuesta:
+							card.respuesta
+
+					});
+
+				await nuevaFlashcard.save();
+
+				flashcardsGuardadas.push(
+					nuevaFlashcard
+				);
+
+			}
+
+			res.json({
+
+				success: true,
+
+				total:
+					flashcardsGuardadas.length,
+
+				flashcards:
+					flashcardsGuardadas
+
+			});
+
+		} catch (error) {
+
+			console.log("ERROR GEMINI:");
+
+			console.log(error);
+
+			res.status(500).json({
+
+				success: false,
+
+				error:
+					error.message,
+
+				stack:
+					error.stack
+
 			});
 
 		}
-
-		res.json({
-			ok: true,
-			nombre: req.file.originalname,
-			tipo: req.file.mimetype
-		});
 
 	}
 );
