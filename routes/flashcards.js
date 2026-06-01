@@ -169,6 +169,9 @@ router.post(
 	upload.single("imagen"),
 	async (req, res) => {
 
+		console.log(req.body);
+		console.log(req.file);
+
 		try {
 
 			const {
