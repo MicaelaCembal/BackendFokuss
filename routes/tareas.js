@@ -116,61 +116,41 @@ router.delete("/:id", async (req, res) => {
 
 router.put("/:id", async (req, res) => {
 
-	console.log(
-		"ID RECIBIDO:",
-		req.params.id
-	);
-
-	
 	try {
 
-		console.log("ID:", req.params.id);
-		const todas = await Tarea.find({});
-console.log("TOTAL:", todas.length);
-console.log("PRIMERA:", todas[0]);
+		const tarea = await Tarea.findOneAndUpdate(
 
-const tarea = await Tarea.findOne({
-	_id: req.params.id
-});
+			{ _id: req.params.id },
 
-console.log("TAREA:", tarea);
+			{
+				$set: req.body
+			},
+
+			{
+				new: true
+			}
+
+		);
 
 		if (!tarea) {
 
 			return res.status(404).json({
-				mensaje: "Tarea no encontrada",
+				mensaje: "Tarea no encontrada"
 			});
 
 		}
 
-		
-
-		tarea.usuario_id = req.body.usuario_id ?? tarea.usuario_id;
-		tarea.titulo = req.body.titulo ?? tarea.titulo;
-		tarea.descripcion = req.body.descripcion ?? tarea.descripcion;
-		tarea.tipo = req.body.tipo ?? tarea.tipo;
-		tarea.materia = req.body.materia ?? tarea.materia;
-		tarea.prioridad = req.body.prioridad ?? tarea.prioridad;
-		tarea.estado = req.body.estado ?? tarea.estado;
-		tarea.fecha_vencimiento = req.body.fecha_vencimiento ?? tarea.fecha_vencimiento;
-		tarea.hora_inicio = req.body.hora_inicio ?? tarea.hora_inicio;
-		tarea.hora_fin = req.body.hora_fin ?? tarea.hora_fin;
-		tarea.es_evento = typeof req.body.es_evento === "boolean" ? req.body.es_evento : tarea.es_evento;
-		tarea.recordatorio = typeof req.body.recordatorio === "boolean" ? req.body.recordatorio : tarea.recordatorio;
-		tarea.repetir = req.body.repetir ?? tarea.repetir;
-		tarea.notas = req.body.notas ?? tarea.notas;
-
-		const tareaActualizada = await tarea.save();
-
-		res.json(tareaActualizada);
+		res.json(tarea);
 
 	}
 	catch (error) {
 
 		res.status(500).json({
-			error: error.message,
+			error: error.message
 		});
+
 	}
+
 });
 
 module.exports = router;
