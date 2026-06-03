@@ -51,26 +51,36 @@ router.get("/calendario/:usuarioId", async (req, res) => {
 
 router.get("/:usuarioId", async (req, res) => {
 
-	const tareas =
-		await Tarea.find({
-			usuario_id:
-				req.params.usuarioId
+	try {
+
+		const tareas = await Tarea.find({
+			usuario_id: req.params.usuarioId,
 		});
 
-	console.log(
-		"GET TAREAS",
-		tareas.map(
-			t => ({
-				id: t._id,
+		console.log(
+			"GET DEVUELVE:"
+		);
+
+		tareas.slice(0,5).forEach(t => {
+
+			console.log({
+				id: t._id.toString(),
 				titulo: t.titulo
-			})
-		)
-	);
+			});
 
-	res.json(tareas);
+		});
 
+		res.json(tareas);
+
+	}
+	catch (error) {
+
+		res.status(500).json({
+			error: error.message,
+		});
+
+	}
 });
-
 
 router.delete("/:id", async (req, res) => {
 
