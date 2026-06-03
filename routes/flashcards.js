@@ -462,6 +462,26 @@ router.get(
         }
 
     }
+
+	
+);
+
+router.get(
+    "/debug/:usuarioId",
+    async (req, res) => {
+
+        const docs =
+            await Flashcard.find({
+                usuario_id:
+                    req.params.usuarioId
+            });
+
+        res.json({
+            cantidad: docs.length,
+            primerDoc: docs[0]
+        });
+
+    }
 );
 
 module.exports = router;
