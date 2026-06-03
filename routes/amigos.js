@@ -33,16 +33,21 @@ router.get('/:userId/sugerencias', async (req, res) => {
     }
 });
 
-// GET buscar
+// GET buscar amigo por nombre/email
 router.get('/:userId/buscar', async (req, res) => {
     try {
         const { q } = req.query;
-        const resultados = await usuariosCollection().find({
-            $or: [
-                { nombre: { $regex: q, $options: 'i' } },
-                { email: { $regex: q, $options: 'i' } }
-            ]
-        }).toArray();
+        const normalizar = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        const qNormalizado = normalizar(q);
+
+        const todos = await usuariosCollection().find({}).toArray();
+        const resultados = todos.filter(u => {
+            const nombre = normalizar(u.nombre || '');
+            const apellido = normalizar(u.apellido || '');
+            const email = normalizar(u.email || '');
+            return nombre.includes(qNormalizado) || apellido.includes(qNormalizado) || email.includes(qNormalizado);
+        });
+
         res.json(resultados);
     } catch (error) {
         res.status(500).json({ mensaje: 'Error buscando usuarios' });
