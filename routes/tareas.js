@@ -84,13 +84,7 @@ router.delete("/:id", async (req, res) => {
 
 		}
 
-		if (!tarea.es_evento) {
-
-			return res.status(400).json({
-				mensaje: "Solo se pueden eliminar eventos del calendario desde esta ruta",
-			});
-
-		}
+		
 
 		await Tarea.findByIdAndDelete(req.params.id);
 
@@ -110,9 +104,24 @@ router.delete("/:id", async (req, res) => {
 
 router.put("/:id", async (req, res) => {
 
+	console.log(
+		"ID RECIBIDO:",
+		req.params.id
+	);
+
+	
 	try {
 
-		const tarea = await Tarea.findById(req.params.id);
+		console.log("ID:", req.params.id);
+		const todas = await Tarea.find({});
+console.log("TOTAL:", todas.length);
+console.log("PRIMERA:", todas[0]);
+
+const tarea = await Tarea.findOne({
+	_id: req.params.id
+});
+
+console.log("TAREA:", tarea);
 
 		if (!tarea) {
 
@@ -122,13 +131,7 @@ router.put("/:id", async (req, res) => {
 
 		}
 
-		if (!tarea.es_evento) {
-
-			return res.status(400).json({
-				mensaje: "Solo se pueden editar eventos del calendario desde esta ruta",
-			});
-
-		}
+		
 
 		tarea.usuario_id = req.body.usuario_id ?? tarea.usuario_id;
 		tarea.titulo = req.body.titulo ?? tarea.titulo;
