@@ -6,6 +6,8 @@ const FlashcardSchema = new mongoose.Schema({
 
     materia: String,
 
+    grupo: String,
+
     pregunta: String,
 
     respuesta: String,

@@ -83,6 +83,9 @@ router.post("/generar", async (req, res) => {
 			materia,
 			texto
 		} = req.body;
+		
+		const grupo =
+			materia + "-" + Date.now();
 
 		const prompt = `
 Generá flashcards de estudio.
@@ -124,13 +127,15 @@ ${texto}
 			const nuevaFlashcard = new Flashcard({
 
 				usuario_id,
-
+			
 				materia,
-
+			
+				grupo,
+			
 				pregunta: card.pregunta,
-
+			
 				respuesta: card.respuesta
-
+			
 			});
 
 			await nuevaFlashcard.save();
@@ -191,6 +196,9 @@ router.post(
 				usuario_id,
 				materia
 			} = req.body;
+			
+			const grupo =
+				materia + "-" + Date.now();
 
 			const imagenBase64 =
 				req.file.buffer.toString("base64");
@@ -366,6 +374,87 @@ router.post(
 		});
 
 	}
+);
+
+router.get(
+    "/historial/:usuarioId",
+    async (req, res) => {
+
+        try {
+
+            const historial =
+                await Flashcard.aggregate([
+
+                    {
+                        $match: {
+                            usuario_id:
+                                req.params.usuarioId
+                        }
+                    },
+
+                    {
+                        $group: {
+
+                            _id: "$grupo",
+
+                            materia: {
+                                $first: "$materia"
+                            },
+
+                            cantidad: {
+                                $sum: 1
+                            },
+
+                            fecha: {
+                                $first:
+                                    "$fecha_creacion"
+                            }
+
+                        }
+                    },
+
+                    {
+                        $sort: {
+                            fecha: -1
+                        }
+                    }
+
+                ]);
+
+            res.json(historial);
+
+        } catch (error) {
+
+            res.status(500).json(error);
+
+        }
+
+    }
+);
+
+router.get(
+    "/grupo/:grupo",
+    async (req, res) => {
+
+        try {
+
+            const flashcards =
+                await Flashcard.find({
+
+                    grupo:
+                        req.params.grupo
+
+                });
+
+            res.json(flashcards);
+
+        } catch (error) {
+
+            res.status(500).json(error);
+
+        }
+
+    }
 );
 
 module.exports = router;
