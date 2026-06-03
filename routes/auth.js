@@ -7,7 +7,20 @@ router.post('/register', async (req, res) => {
 
     try {
 
-        const { email, password } = req.body;
+        const {
+            nombre,
+            apellido,
+            email,
+            password,
+            nivel,
+            carrera,
+        } = req.body;
+
+        if (!nombre || !apellido || !email || !password || !nivel) {
+            return res.status(400).json({
+                mensaje: 'Faltan datos obligatorios para registrar el usuario',
+            });
+        }
 
         const usuarioExiste = await User.findOne({ email });
 
@@ -20,8 +33,12 @@ router.post('/register', async (req, res) => {
         }
 
         const nuevoUsuario = new User({
+            nombre,
+            apellido,
             email,
             password,
+            nivel,
+            carrera: nivel === 'universitario' ? carrera : '',
         });
 
         await nuevoUsuario.save();
