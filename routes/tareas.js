@@ -104,9 +104,24 @@ router.delete("/:id", async (req, res) => {
 
 router.put("/:id", async (req, res) => {
 
+	console.log(
+		"ID RECIBIDO:",
+		req.params.id
+	);
+
+	
 	try {
 
-		const tarea = await Tarea.findById(req.params.id);
+		console.log("ID:", req.params.id);
+		const todas = await Tarea.find({});
+console.log("TOTAL:", todas.length);
+console.log("PRIMERA:", todas[0]);
+
+const tarea = await Tarea.findOne({
+	_id: req.params.id
+});
+
+console.log("TAREA:", tarea);
 
 		if (!tarea) {
 
