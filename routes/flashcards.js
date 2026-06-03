@@ -46,19 +46,23 @@ router.delete("/:id", async (req, res) => {
 
 router.post("/generar", async (req, res) => {
     try {
-        const { usuario_id, materia, texto } = req.body;
-        const grupo = materia + "-" + Date.now();
+        const { usuario_id, texto } = req.body;
 
         const prompt = `
-Generá flashcards de estudio.
-Respondé únicamente JSON.
-Formato:
-[
-    {
-        "pregunta":"...",
-        "respuesta":"..."
-    }
-]
+Analiza el siguiente texto y determina automáticamente cuál es la materia o tema principal corta (ej. "Historia", "Física", "Programación").
+Luego genera flashcards de estudio.
+
+Respondé únicamente en formato JSON puro, sin decoraciones de código markdown.
+Formato esperado:
+{
+    "materia": "Nombre de la materia detectada",
+    "cards": [
+        {
+            "pregunta": "...",
+            "respuesta": "..."
+        }
+    ]
+}
 
 Texto:
 ${texto}
@@ -72,13 +76,15 @@ ${texto}
         let resultado = response.text;
         resultado = resultado.replace(/```json/g, "").replace(/```/g, "").trim();
 
-        const cards = JSON.parse(resultado);
+        const estructuraEfectiva = JSON.parse(resultado);
+        const materiaDetectada = estructuraEfectiva.materia || "General";
+        const grupo = materiaDetectada + "-" + Date.now();
         const flashcardsGuardadas = [];
 
-        for (const card of cards) {
+        for (const card of estructuraEfectiva.cards) {
             const nuevaFlashcard = new Flashcard({
                 usuario_id,
-                materia,
+                materia: materiaDetectada,
                 grupo,
                 pregunta: card.pregunta,
                 respuesta: card.respuesta
@@ -106,22 +112,23 @@ router.post("/generar-imagen", upload.single("imagen"), async (req, res) => {
             return res.status(400).json({ success: false, error: "No llegó ninguna imagen" });
         }
 
-        const { usuario_id, materia } = req.body;
-        // Creamos el identificador único del grupo de estudio
-        const grupo = materia + "-" + Date.now();
+        const { usuario_id } = req.body;
         const imagenBase64 = req.file.buffer.toString("base64");
 
         const prompt = `
-Analiza la imagen.
-Extrae toda la información importante.
-Genera flashcards de estudio.
-Devuelve SOLO JSON.
-[
-    {
-        "pregunta":"...",
-        "respuesta":"..."
-    }
-]
+Analiza la imagen de los apuntes y deduce inteligentemente cuál es la materia o tema académico principal usando un título corto (ej: "Anatomía", "Química", "Literatura").
+Extrae la información importante y genera flashcards de estudio.
+
+Devuelve estrictamente un objeto JSON con este formato exacto:
+{
+    "materia": "Nombre de la materia detectada",
+    "cards": [
+        {
+            "pregunta": "...",
+            "respuesta": "..."
+        }
+    ]
+}
 `;
 
         let response;
@@ -157,13 +164,15 @@ Devuelve SOLO JSON.
         let resultado = response.text;
         resultado = resultado.replace(/```json/g, "").replace(/```/g, "").trim();
 
-        const cards = JSON.parse(resultado);
+        const estructuraEfectiva = JSON.parse(resultado);
+        const materiaDetectada = estructuraEfectiva.materia || "General";
+        const grupo = materiaDetectada + "-" + Date.now();
         const flashcardsGuardadas = [];
 
-        for (const card of cards) {
+        for (const card of estructuraEfectiva.cards) {
             const nuevaFlashcard = new Flashcard({
                 usuario_id,
-                materia,
+                materia: materiaDetectada,
                 grupo, 
                 pregunta: card.pregunta,
                 respuesta: card.respuesta
