@@ -417,7 +417,14 @@ router.get(
                         $sort: {
                             fecha: -1
                         }
-                    }
+                    },
+
+					{
+						$match: {
+							usuario_id: req.params.usuarioId,
+							grupo: { $ne: null }
+						}
+					}
 
                 ]);
 
