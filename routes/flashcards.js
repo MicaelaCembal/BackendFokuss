@@ -398,16 +398,12 @@ router.get(
                             _id: "$grupo",
 
                             materia: {
-                                $first: "$materia"
+                                $first:
+                                    "$materia"
                             },
 
                             cantidad: {
                                 $sum: 1
-                            },
-
-                            fecha: {
-                                $first:
-                                    "$fecha_creacion"
                             }
 
                         }
@@ -415,16 +411,9 @@ router.get(
 
                     {
                         $sort: {
-                            fecha: -1
+                            cantidad: -1
                         }
-                    },
-
-					{
-						$match: {
-							usuario_id: req.params.usuarioId,
-							grupo: { $ne: null }
-						}
-					}
+                    }
 
                 ]);
 
@@ -432,9 +421,33 @@ router.get(
 
         } catch (error) {
 
+            console.log(error);
+
             res.status(500).json(error);
 
         }
+
+    }
+);
+
+router.get(
+    "/debug-grupos/:usuarioId",
+    async (req, res) => {
+
+        const docs =
+            await Flashcard.find({
+
+                usuario_id:
+                    req.params.usuarioId
+
+            });
+
+        const grupos =
+            docs.map(
+                x => x.grupo
+            );
+
+        res.json(grupos);
 
     }
 );
