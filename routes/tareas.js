@@ -84,13 +84,7 @@ router.delete("/:id", async (req, res) => {
 
 		}
 
-		if (!tarea.es_evento) {
-
-			return res.status(400).json({
-				mensaje: "Solo se pueden eliminar eventos del calendario desde esta ruta",
-			});
-
-		}
+		
 
 		await Tarea.findByIdAndDelete(req.params.id);
 
@@ -122,13 +116,7 @@ router.put("/:id", async (req, res) => {
 
 		}
 
-		if (!tarea.es_evento) {
-
-			return res.status(400).json({
-				mensaje: "Solo se pueden editar eventos del calendario desde esta ruta",
-			});
-
-		}
+		
 
 		tarea.usuario_id = req.body.usuario_id ?? tarea.usuario_id;
 		tarea.titulo = req.body.titulo ?? tarea.titulo;
