@@ -10,6 +10,7 @@ const flashcardsRoutes = require("./routes/flashcards");
 const pomodoroRoutes = require("./routes/pomodoro");
 const amigosRoutes = require("./routes/amigos");
 const rachasCompartidasRoutes = require("./routes/rachasCompartidas");
+const musicaRoutes = require('./routes/musica');
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use("/api/flashcards", flashcardsRoutes);
 app.use("/api/pomodoro", pomodoroRoutes);
 app.use("/api/amigos", amigosRoutes);
 app.use("/api/rachas-compartidas", rachasCompartidasRoutes);
+app.use('/api/musica', musicaRoutes);
 
 const mongoURI = process.env.MONGODB_URI;
 
