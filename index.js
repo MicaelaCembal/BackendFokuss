@@ -16,6 +16,10 @@ const pomodoroRoutes = require("./routes/pomodoro");
 
 const amigosRoutes = require("./routes/amigos");
 
+const rachasCompartidasRoutes = require("./routes/rachasCompartidas");
+
+app.use("/api/rachas-compartidas", rachasCompartidasRoutes);
+
 const app = express();
 
 app.use(cors());
