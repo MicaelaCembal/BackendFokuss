@@ -49,6 +49,32 @@ router.post("/", async (req, res) => {
                         }
                     }
                 );
+                
+                // Registrar en rachas compartidas
+                await mongoose.connection.db.collection("rachas_compartidas").find({
+                    $or: [{ usuarioA: req.body.usuario_id }, { usuarioB: req.body.usuario_id }],
+                    estado: "activa"
+                }).toArray().then(async (rachas) => {
+                    const fechaAyer = ayer();
+                    for (const r of rachas) {
+                        const esA = r.usuarioA === req.body.usuario_id;
+                        const campoPropio = esA ? "ultimo_estudio_A" : "ultimo_estudio_B";
+                        const campoOtro = esA ? "ultimo_estudio_B" : "ultimo_estudio_A";
+                        const ultimoPropio = r[campoPropio] || "";
+                        const ultimoOtro = r[campoOtro] || "";
+                        if (ultimoPropio === fechaHoy) continue;
+                        const update = { [campoPropio]: fechaHoy };
+                        if (ultimoOtro === fechaHoy || ultimoOtro === fechaAyer) {
+                            update.racha = (r.racha || 0) + 1;
+                        } else {
+                            update.racha = 1;
+                        }
+                        await mongoose.connection.db.collection("rachas_compartidas").updateOne(
+                            { _id: r._id },
+                            { $set: update }
+                        );
+                    }
+                });
             }
         }
 
