@@ -22,6 +22,8 @@ const tareaSchema = new mongoose.Schema({
 		default: "tarea",
 	},
 
+	tipo_examen: { type: String, default: null },
+
 	materia: {
 		type: String,
 		default: "",
