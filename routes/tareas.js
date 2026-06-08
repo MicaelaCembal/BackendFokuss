@@ -6,6 +6,7 @@ const Tarea = require("../models/Tarea");
 
 
 router.post("/", async (req, res) => {
+	console.log("📥 RECIBIDO EN BACKEND (Body):", req.body);
 
 	try {
 
