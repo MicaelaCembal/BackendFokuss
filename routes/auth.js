@@ -6,14 +6,20 @@ const nodemailer = require('nodemailer');
 
 const User = require('../models/User');
 
-const transporter = nodemailer.createTransport({
-  host: "sandbox.smtp.mailtrap.io",
-  port: 2525,
-  auth: {
-    user: "aa58ab52263a0b",
-    pass: "db518f0e8cceb7"
+const { Resend } = require('resend');
+
+const resend = new Resend('re_2xQU7aYk_FuLSbLsuquQJK71F9WqUScuG');
+
+const transporter = {
+  sendMail: async (mailOptions) => {
+    return resend.emails.send({
+      from: 'Fokuss <onboarding@resend.dev>', 
+      to: mailOptions.to,                   
+      subject: mailOptions.subject,
+      html: mailOptions.html || mailOptions.text
+    });
   }
-});
+};
 
 
 const verificarToken = (req, res, next) => {
