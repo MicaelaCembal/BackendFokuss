@@ -176,25 +176,24 @@ router.post('/forgot-password', async (req, res) => {
 
 router.post('/reset-password', async (req, res) => {
     try {
-        const { token, password } = req.body; // Unificado a 'password' para consistencia
+        const { token, password } = req.body; 
 
         if (!token || !password) {
             return res.status(400).json({ mensaje: 'Faltan datos obligatorios.' });
         }
 
-        // Validamos el token temporal que mandó Resend
+        // Validamos el token temporal
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         const usuario = await User.findById(decoded.id);
         if (!usuario) {
             return res.status(404).json({ mensaje: 'Usuario no encontrado.' });
         }
-
-        // Hasheamos la nueva contraseña de forma segura
-        const nuevaPasswordHash = await bcrypt.hash(password, 10);
         
-        usuario.password = nuevaPasswordHash;
-        await usuario.save(); // Impacta directo en MongoDB Atlas
+        
+        usuario.password = password; 
+        
+        await usuario.save(); // Se ejecuta el pre-save, se hashea una sola vez y va a Atlas
 
         res.json({ mensaje: 'Contraseña actualizada con éxito.' });
 
