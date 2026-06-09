@@ -131,45 +131,48 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// ─── CONFIGURAR NUEVA CONTRASEÑA (SOLUCIONADO CON COLECCIÓN NATIVA) ───────────
-
 router.post('/reset-password', async (req, res) => {
     try {
-        const token = req.body.token;
-        const passwordLimpia = req.body.password || req.body.passwordNueva; 
+        const { token, password } = req.body;
 
-        if (!token || !passwordLimpia) {
+        if (!token || !password) {
             return res.status(400).json({ mensaje: 'Faltan datos obligatorios.' });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const codigoLimpio = token.trim();
 
-        // Convertimos el ID a formato ObjectId de Mongoose para la consulta nativa
-        const objectId = new require('mongoose').Types.ObjectId(decoded.id);
-        const usuario = await User.collection.findOne({ _id: objectId });
-        
+        // Buscamos el usuario que tenga ese código y que no haya expirado
+        const usuario = await User.collection.findOne({
+            resetCodigo: codigoLimpio,
+            resetExpira: { $gt: new Date() }
+        });
+
         if (!usuario) {
-            return res.status(404).json({ mensaje: 'Usuario no encontrado.' });
+            return res.status(400).json({ 
+                mensaje: 'El código es inválido o ya expiró.' 
+            });
         }
 
-        // Hasheamos manualmente la contraseña
-        const nuevaPasswordHash = await bcrypt.hash(passwordLimpia, 10);
-        
-        // Actualizamos directo en la base de datos usando updateOne nativo
+        const nuevaPasswordHash = await bcrypt.hash(password, 10);
+
+        // Actualizamos la password y borramos el código usado
         await User.collection.updateOne(
-            { _id: objectId },
-            { $set: { password: nuevaPasswordHash } }
+            { _id: usuario._id },
+            { 
+                $set: { password: nuevaPasswordHash },
+                $unset: { resetCodigo: '', resetExpira: '' }
+            }
         );
 
         res.json({ mensaje: 'Contraseña actualizada con éxito.' });
 
     } catch (error) {
         console.log(error);
-        return res.status(400).json({
-            mensaje: 'El token es inválido o ya expiró.',
-        });
+        res.status(500).json({ mensaje: 'Error del servidor.' });
     }
 });
+
+
 router.post('/forgot-password', async (req, res) => {
     try {
         const { email } = req.body;
@@ -181,10 +184,14 @@ router.post('/forgot-password', async (req, res) => {
             });
         }
 
-        const tokenTemporal = jwt.sign(
-            { id: usuario._id },
-            process.env.JWT_SECRET,
-            { expiresIn: '15m' }
+        // Código numérico de 6 dígitos, mucho más simple de copiar
+        const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiracion = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+
+        // Guardamos el código y su expiración en el usuario
+        await User.collection.updateOne(
+            { _id: usuario._id },
+            { $set: { resetCodigo: codigo, resetExpira: expiracion } }
         );
 
         const mailOptions = {
@@ -194,11 +201,11 @@ router.post('/forgot-password', async (req, res) => {
                 <div style="font-family: sans-serif; padding: 20px; max-width: 500px; border: 1px solid #ddd; border-radius: 8px;">
                     <h1 style="color: #0057C8; text-align: center;">FOKUSS</h1>
                     <p>Hola <strong>${usuario.nombre || 'Usuario'}</strong>,</p>
-                    <p>Recibimos una solicitud para restablecer tu contraseña. Copiá el siguiente token de seguridad e ingresalo en la aplicación:</p>
-                    <div style="background-color: #F2F2F2; padding: 15px; text-align: center; font-size: 14px; font-family: monospace; word-break: break-all; border-radius: 6px; border: 1px dashed #B96CFF; font-weight: bold; margin: 20px 0;">
-                        ${tokenTemporal}
+                    <p>Tu código para restablecer la contraseña es:</p>
+                    <div style="background-color: #F2F2F2; padding: 15px; text-align: center; font-size: 36px; font-family: monospace; letter-spacing: 8px; border-radius: 6px; border: 1px dashed #B96CFF; font-weight: bold; margin: 20px 0;">
+                        ${codigo}
                     </div>
-                    <p style="font-size: 12px; color: #666;">Este token es confidencial y va a expirar automáticamente en 15 minutos.</p>
+                    <p style="font-size: 12px; color: #666;">Este código expira en 15 minutos.</p>
                 </div>
             `,
         };
