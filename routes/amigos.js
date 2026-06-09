@@ -203,4 +203,18 @@ router.delete('/:userId/eliminar', async (req, res) => {
         res.status(500).json({ mensaje: 'Error eliminando amigo' });
     }
 });
+
+// GET solicitudes enviadas por el usuario
+router.get('/:userId/solicitudes-enviadas', async (req, res) => {
+    try {
+        const todos = await usuariosCollection().find({
+            solicitudes_pendientes: req.params.userId
+        }).toArray();
+        const ids = todos.map(u => u._id);
+        res.json(ids);
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error obteniendo solicitudes enviadas' });
+    }
+});
+
 module.exports = router;
