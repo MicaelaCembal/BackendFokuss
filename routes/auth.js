@@ -174,11 +174,15 @@ router.post('/forgot-password', async (req, res) => {
 
 // ─── CONFIGURAR NUEVA CONTRASEÑA ──────────────────────────────────────────────
 
+// ─── CONFIGURAR NUEVA CONTRASEÑA (REPARADO Y BLINDADO) ─────────────────────────
+
 router.post('/reset-password', async (req, res) => {
     try {
-        const { token, password } = req.body; 
+        // Aceptamos tanto 'password' como 'passwordNueva' por si las moscas
+        const token = req.body.token;
+        const passwordLimpia = req.body.password || req.body.passwordNueva; 
 
-        if (!token || !password) {
+        if (!token || !passwordLimpia) {
             return res.status(400).json({ mensaje: 'Faltan datos obligatorios.' });
         }
 
@@ -189,11 +193,13 @@ router.post('/reset-password', async (req, res) => {
         if (!usuario) {
             return res.status(404).json({ mensaje: 'Usuario no encontrado.' });
         }
+
+        // Como tu modelo NO encripta solo, lo hacemos acá manualmente de forma segura
+        const nuevaPasswordHash = await bcrypt.hash(passwordLimpia, 10);
         
-        
-        usuario.password = password; 
-        
-        await usuario.save(); // Se ejecuta el pre-save, se hashea una sola vez y va a Atlas
+        // Asignamos el hash directo
+        usuario.password = nuevaPasswordHash;
+        await usuario.save(); 
 
         res.json({ mensaje: 'Contraseña actualizada con éxito.' });
 
@@ -204,7 +210,6 @@ router.post('/reset-password', async (req, res) => {
         });
     }
 });
-
 // ─── OBTENER TODOS LOS USUARIOS (Ruta Protegida) ──────────────────────────────
 
 router.get('/users', verificarToken, async (req, res) => {
