@@ -84,14 +84,14 @@ router.post('/register', async (req, res) => {
         res.status(500).json({ mensaje: 'Error del servidor' });
     }
 });
-
-// ─── LOGIN ───────────────────────────────────────────────────────────────────
+// ─── LOGIN (SOLUCIONADO CON COLECCIÓN NATIVA) ─────────────────────────────
 
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const usuario = await User.findOne({ email });
+        // Buscamos directo en la coleccion nativa sin pasar por los filtros de Mongoose
+        const usuario = await User.collection.findOne({ email: email.trim() });
 
         if (!usuario) {
             return res.status(400).json({
@@ -99,6 +99,7 @@ router.post('/login', async (req, res) => {
             });
         }
 
+        // Comparamos la contraseña enviada con el hash real de Atlas
         const passwordCorrecta = await bcrypt.compare(password, usuario.password);
 
         if (!passwordCorrecta) {
@@ -107,13 +108,15 @@ router.post('/login', async (req, res) => {
             });
         }
 
+        // Generamos el token JWT
         const token = jwt.sign(
             { id: usuario._id, email: usuario.email },
             process.env.JWT_SECRET,
             { expiresIn: '30d' }
         );
 
-        const usuarioSinPassword = usuario.toObject();
+        // Limpiamos la password antes de responder
+        const usuarioSinPassword = { ...usuario };
         delete usuarioSinPassword.password;
 
         res.json({
@@ -128,8 +131,45 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// ─── SOLICITAR RECUPERACIÓN DE CONTRASEÑA ─────────────────────────────────────
+// ─── CONFIGURAR NUEVA CONTRASEÑA (SOLUCIONADO CON COLECCIÓN NATIVA) ───────────
 
+router.post('/reset-password', async (req, res) => {
+    try {
+        const token = req.body.token;
+        const passwordLimpia = req.body.password || req.body.passwordNueva; 
+
+        if (!token || !passwordLimpia) {
+            return res.status(400).json({ mensaje: 'Faltan datos obligatorios.' });
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        // Convertimos el ID a formato ObjectId de Mongoose para la consulta nativa
+        const objectId = new require('mongoose').Types.ObjectId(decoded.id);
+        const usuario = await User.collection.findOne({ _id: objectId });
+        
+        if (!usuario) {
+            return res.status(404).json({ mensaje: 'Usuario no encontrado.' });
+        }
+
+        // Hasheamos manualmente la contraseña
+        const nuevaPasswordHash = await bcrypt.hash(passwordLimpia, 10);
+        
+        // Actualizamos directo en la base de datos usando updateOne nativo
+        await User.collection.updateOne(
+            { _id: objectId },
+            { $set: { password: nuevaPasswordHash } }
+        );
+
+        res.json({ mensaje: 'Contraseña actualizada con éxito.' });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(400).json({
+            mensaje: 'El token es inválido o ya expiró.',
+        });
+    }
+});
 router.post('/forgot-password', async (req, res) => {
     try {
         const { email } = req.body;
@@ -172,44 +212,6 @@ router.post('/forgot-password', async (req, res) => {
     }
 });
 
-// ─── CONFIGURAR NUEVA CONTRASEÑA ──────────────────────────────────────────────
-
-// ─── CONFIGURAR NUEVA CONTRASEÑA (REPARADO Y BLINDADO) ─────────────────────────
-
-router.post('/reset-password', async (req, res) => {
-    try {
-        // Aceptamos tanto 'password' como 'passwordNueva' por si las moscas
-        const token = req.body.token;
-        const passwordLimpia = req.body.password || req.body.passwordNueva; 
-
-        if (!token || !passwordLimpia) {
-            return res.status(400).json({ mensaje: 'Faltan datos obligatorios.' });
-        }
-
-        // Validamos el token temporal
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-        const usuario = await User.findById(decoded.id);
-        if (!usuario) {
-            return res.status(404).json({ mensaje: 'Usuario no encontrado.' });
-        }
-
-        // Como tu modelo NO encripta solo, lo hacemos acá manualmente de forma segura
-        const nuevaPasswordHash = await bcrypt.hash(passwordLimpia, 10);
-        
-        // Asignamos el hash directo
-        usuario.password = nuevaPasswordHash;
-        await usuario.save(); 
-
-        res.json({ mensaje: 'Contraseña actualizada con éxito.' });
-
-    } catch (error) {
-        console.log(error);
-        return res.status(400).json({
-            mensaje: 'El token es inválido o ya expiró.',
-        });
-    }
-});
 // ─── OBTENER TODOS LOS USUARIOS (Ruta Protegida) ──────────────────────────────
 
 router.get('/users', verificarToken, async (req, res) => {
