@@ -137,4 +137,15 @@ router.get("/:userId/pendientes", async (req, res) => {
     }
 });
 
+// DELETE finalizar racha compartida
+router.delete("/finalizar", async (req, res) => {
+    try {
+        const { rachaId } = req.body;
+        await col().deleteOne({ _id: new mongoose.Types.ObjectId(rachaId) });
+        res.json({ mensaje: "Racha finalizada" });
+    } catch (error) {
+        res.status(500).json({ mensaje: "Error finalizando racha" });
+    }
+});
+
 module.exports = router;
