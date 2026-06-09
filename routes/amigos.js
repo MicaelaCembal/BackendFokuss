@@ -167,22 +167,40 @@ router.get('/:userId/solicitudes', async (req, res) => {
     }
 });
 
-// DELETE eliminar amigo
+// DELETE eliminar amigo (mutuo + elimina racha compartida)
 router.delete('/:userId/eliminar', async (req, res) => {
     try {
         const { amigoId } = req.body;
         const usuario = await usuariosCollection().findOne({ _id: req.params.userId });
         if (!usuario) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
 
+        // Eliminar de los dos lados
         const amigos = (usuario.amigos || []).filter(id => id !== amigoId);
         await usuariosCollection().updateOne(
             { _id: req.params.userId },
             { $set: { amigos } }
         );
-        res.json({ mensaje: 'Amigo eliminado', amigos });
+
+        const amigo = await usuariosCollection().findOne({ _id: amigoId });
+        if (amigo) {
+            const amigosDeAmigo = (amigo.amigos || []).filter(id => id !== req.params.userId);
+            await usuariosCollection().updateOne(
+                { _id: amigoId },
+                { $set: { amigos: amigosDeAmigo } }
+            );
+        }
+
+        // Eliminar racha compartida si existe
+        await mongoose.connection.db.collection('rachas_compartidas').deleteOne({
+            $or: [
+                { usuarioA: req.params.userId, usuarioB: amigoId },
+                { usuarioA: amigoId, usuarioB: req.params.userId }
+            ]
+        });
+
+        res.json({ mensaje: 'Amigo eliminado' });
     } catch (error) {
         res.status(500).json({ mensaje: 'Error eliminando amigo' });
     }
 });
-
 module.exports = router;
