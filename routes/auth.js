@@ -6,8 +6,6 @@ const nodemailer = require('nodemailer');
 
 const User = require('../models/User');
 
-const nodemailer = require('nodemailer');
-
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   host: 'smtp.gmail.com',
