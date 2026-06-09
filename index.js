@@ -10,7 +10,9 @@ const flashcardsRoutes = require("./routes/flashcards");
 const pomodoroRoutes = require("./routes/pomodoro");
 const amigosRoutes = require("./routes/amigos");
 const rachasCompartidasRoutes = require("./routes/rachasCompartidas");
-const musicaRoutes = require('./routes/musica');
+
+// Cron de notificaciones push
+const { iniciarCron } = require("./jobs/notificacionesCron");
 
 const app = express();
 
@@ -29,13 +31,15 @@ app.use("/api/flashcards", flashcardsRoutes);
 app.use("/api/pomodoro", pomodoroRoutes);
 app.use("/api/amigos", amigosRoutes);
 app.use("/api/rachas-compartidas", rachasCompartidasRoutes);
-app.use('/api/musica', musicaRoutes);
 
 const mongoURI = process.env.MONGODB_URI;
 
 mongoose.connect(mongoURI)
 	.then(() => {
 		console.log('Conexión exitosa a MongoDB Atlas');
+
+		// Iniciamos el cron DESPUÉS de conectar a la base de datos
+		iniciarCron();
 	})
 	.catch((err) => {
 		console.log(err);
