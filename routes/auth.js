@@ -4,10 +4,11 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Brevo = require('@getbrevo/brevo');
+const SibApiV3Sdk = require('sib-api-v3-sdk');
 
-const brevoClient = Brevo.ApiClient.instance;
-brevoClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
-const emailApi = new Brevo.TransactionalEmailsApi();
+const defaultClient = SibApiV3Sdk.ApiClient.instance;
+defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
+const emailApi = new SibApiV3Sdk.TransactionalEmailsApi();
 
 const transporter = {
   sendMail: async (mailOptions) => {
@@ -20,7 +21,6 @@ const transporter = {
   }
 };
 
-// Middleware para proteger rutas con JWT
 const verificarToken = (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
