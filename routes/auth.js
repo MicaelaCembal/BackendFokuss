@@ -20,24 +20,6 @@ const transporter = {
   }
 };
 
-const verificarToken = (req, res, next) => {
-    try {
-        const authHeader = req.headers.authorization;
-
-        if (!authHeader) {
-            return res.status(401).json({ mensaje: 'Acceso denegado. Token requerido.' });
-        }
-
-        const token = authHeader.replace('Bearer ', '');
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        
-        req.user = decoded; 
-        next();
-    } catch (error) {
-        return res.status(401).json({ mensaje: 'Token inválido o expirado.' });
-    }
-};
-
 // ─── REGISTRO ────────────────────────────────────────────────────────────────
 
 router.post('/register', async (req, res) => {
@@ -84,38 +66,31 @@ router.post('/register', async (req, res) => {
         res.status(500).json({ mensaje: 'Error del servidor' });
     }
 });
-// ─── LOGIN (SOLUCIONADO CON COLECCIÓN NATIVA) ─────────────────────────────
+
+// ─── LOGIN ────────────────────────────────────────────────────────────────────
 
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // Buscamos directo en la coleccion nativa sin pasar por los filtros de Mongoose
         const usuario = await User.collection.findOne({ email: email.trim() });
 
         if (!usuario) {
-            return res.status(400).json({
-                mensaje: 'Usuario no encontrado',
-            });
+            return res.status(400).json({ mensaje: 'Usuario no encontrado' });
         }
 
-        // Comparamos la contraseña enviada con el hash real de Atlas
         const passwordCorrecta = await bcrypt.compare(password, usuario.password);
 
         if (!passwordCorrecta) {
-            return res.status(400).json({
-                mensaje: 'Contraseña incorrecta',
-            });
+            return res.status(400).json({ mensaje: 'Contraseña incorrecta' });
         }
 
-        // Generamos el token JWT
         const token = jwt.sign(
             { id: usuario._id, email: usuario.email },
             process.env.JWT_SECRET,
             { expiresIn: '30d' }
         );
 
-        // Limpiamos la password antes de responder
         const usuarioSinPassword = { ...usuario };
         delete usuarioSinPassword.password;
 
@@ -131,47 +106,7 @@ router.post('/login', async (req, res) => {
     }
 });
 
-router.post('/reset-password', async (req, res) => {
-    try {
-        const { token, password } = req.body;
-
-        if (!token || !password) {
-            return res.status(400).json({ mensaje: 'Faltan datos obligatorios.' });
-        }
-
-        const codigoLimpio = token.trim();
-
-        // Buscamos el usuario que tenga ese código y que no haya expirado
-        const usuario = await User.collection.findOne({
-            resetCodigo: codigoLimpio,
-            resetExpira: { $gt: new Date() }
-        });
-
-        if (!usuario) {
-            return res.status(400).json({ 
-                mensaje: 'El código es inválido o ya expiró.' 
-            });
-        }
-
-        const nuevaPasswordHash = await bcrypt.hash(password, 10);
-
-        // Actualizamos la password y borramos el código usado
-        await User.collection.updateOne(
-            { _id: usuario._id },
-            { 
-                $set: { password: nuevaPasswordHash },
-                $unset: { resetCodigo: '', resetExpira: '' }
-            }
-        );
-
-        res.json({ mensaje: 'Contraseña actualizada con éxito.' });
-
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({ mensaje: 'Error del servidor.' });
-    }
-});
-
+// ─── FORGOT PASSWORD ──────────────────────────────────────────────────────────
 
 router.post('/forgot-password', async (req, res) => {
     try {
@@ -184,11 +119,9 @@ router.post('/forgot-password', async (req, res) => {
             });
         }
 
-        // Código numérico de 6 dígitos, mucho más simple de copiar
         const codigo = Math.floor(100000 + Math.random() * 900000).toString();
-        const expiracion = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+        const expiracion = new Date(Date.now() + 15 * 60 * 1000);
 
-        // Guardamos el código y su expiración en el usuario
         await User.collection.updateOne(
             { _id: usuario._id },
             { $set: { resetCodigo: codigo, resetExpira: expiracion } }
@@ -219,9 +152,48 @@ router.post('/forgot-password', async (req, res) => {
     }
 });
 
-// ─── OBTENER TODOS LOS USUARIOS (Ruta Protegida) ──────────────────────────────
+// ─── RESET PASSWORD ───────────────────────────────────────────────────────────
 
-router.get('/users', verificarToken, async (req, res) => {
+router.post('/reset-password', async (req, res) => {
+    try {
+        const { token, password } = req.body;
+
+        if (!token || !password) {
+            return res.status(400).json({ mensaje: 'Faltan datos obligatorios.' });
+        }
+
+        const codigoLimpio = token.trim();
+
+        const usuario = await User.collection.findOne({
+            resetCodigo: codigoLimpio,
+            resetExpira: { $gt: new Date() }
+        });
+
+        if (!usuario) {
+            return res.status(400).json({ mensaje: 'El código es inválido o ya expiró.' });
+        }
+
+        const nuevaPasswordHash = await bcrypt.hash(password, 10);
+
+        await User.collection.updateOne(
+            { _id: usuario._id },
+            {
+                $set: { password: nuevaPasswordHash },
+                $unset: { resetCodigo: '', resetExpira: '' }
+            }
+        );
+
+        res.json({ mensaje: 'Contraseña actualizada con éxito.' });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ mensaje: 'Error del servidor.' });
+    }
+});
+
+// ─── OBTENER TODOS LOS USUARIOS ───────────────────────────────────────────────
+
+router.get('/users', async (req, res) => {
     try {
         const usuarios = await User.find({}).select('-password');
         res.json(usuarios);
@@ -231,9 +203,9 @@ router.get('/users', verificarToken, async (req, res) => {
     }
 });
 
-// ─── OBTENER USUARIO POR ID (Ruta Protegida) ──────────────────────────────────
+// ─── OBTENER USUARIO POR ID ───────────────────────────────────────────────────
 
-router.get('/users/:id', verificarToken, async (req, res) => {
+router.get('/users/:id', async (req, res) => {
     try {
         const usuario = await User.findById(req.params.id).select('-password');
 
@@ -248,9 +220,9 @@ router.get('/users/:id', verificarToken, async (req, res) => {
     }
 });
 
-// ─── ACTUALIZAR USUARIO (Ruta Protegida) ──────────────────────────────────────
+// ─── ACTUALIZAR USUARIO ───────────────────────────────────────────────────────
 
-router.put('/users/:id', verificarToken, async (req, res) => {
+router.put('/users/:id', async (req, res) => {
     try {
         if (req.body.password) {
             req.body.password = await bcrypt.hash(req.body.password, 10);
@@ -276,9 +248,9 @@ router.put('/users/:id', verificarToken, async (req, res) => {
     }
 });
 
-// ─── ELIMINAR USUARIO (Ruta Protegida) ────────────────────────────────────────
+// ─── ELIMINAR USUARIO ─────────────────────────────────────────────────────────
 
-router.delete('/users/:id', verificarToken, async (req, res) => {
+router.delete('/users/:id', async (req, res) => {
     try {
         const usuarioEliminado = await User.findByIdAndDelete(req.params.id);
 
