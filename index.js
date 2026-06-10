@@ -11,7 +11,7 @@ const pomodoroRoutes = require("./routes/pomodoro");
 const amigosRoutes = require("./routes/amigos");
 const rachasCompartidasRoutes = require("./routes/rachasCompartidas");
 const recompensasRoutes = require("./routes/recompensas");
-
+const musicaRoutes = require("./routes/musica");
 const { iniciarCron } = require("./jobs/notificacionesCron");
 
 const app = express();
@@ -32,6 +32,7 @@ app.use("/api/pomodoro", pomodoroRoutes);
 app.use("/api/recompensas", recompensasRoutes);
 app.use("/api/amigos", amigosRoutes);
 app.use("/api/rachas-compartidas", rachasCompartidasRoutes);
+app.use("/api/musica", musicaRoutes);
 
 const mongoURI = process.env.MONGODB_URI;
 
