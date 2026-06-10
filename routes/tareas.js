@@ -1,121 +1,65 @@
 const express = require("express");
-
 const router = express.Router();
-
+const mongoose = require("mongoose");
 const Tarea = require("../models/Tarea");
 
-
 router.post("/", async (req, res) => {
-	console.log("📥 RECIBIDO EN BACKEND (Body):", req.body);
-
-	try {
-
-		const nuevaTarea = new Tarea(req.body);
-
-		await nuevaTarea.save();
-
-		res.status(201).json(nuevaTarea);
-
-	}
-	catch (error) {
-
-		res.status(500).json({
-			error: error.message,
-		});
-	}
+  console.log("RECIBIDO EN BACKEND (Body):", req.body);
+  try {
+    const nuevaTarea = new Tarea(req.body);
+    await nuevaTarea.save();
+    res.status(201).json(nuevaTarea);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.get("/calendario/:usuarioId", async (req, res) => {
-
-	try {
-
-		const tareas = await Tarea.find({
-
-			usuario_id: req.params.usuarioId,
-
-			es_evento: true
-
-		});
-
-		res.json(tareas);
-
-	}
-	catch (error) {
-
-		res.status(500).json({
-
-			error: error.message,
-
-		});
-	}
+  try {
+    const tareas = await Tarea.find({
+      usuario_id: req.params.usuarioId,
+      es_evento: true
+    });
+    res.json(tareas);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.get("/:usuarioId", async (req, res) => {
+  try {
+    const tareas = await Tarea.find({ usuario_id: req.params.usuarioId });
 
-	try {
+    console.log("GET DEVUELVE:");
+    tareas.slice(0, 5).forEach(t => {
+      console.log({ id: t._id.toString(), titulo: t.titulo });
+    });
 
-		const tareas = await Tarea.find({
-			usuario_id: req.params.usuarioId,
-		});
-
-		console.log(
-			"GET DEVUELVE:"
-		);
-
-		tareas.slice(0,5).forEach(t => {
-
-			console.log({
-				id: t._id.toString(),
-				titulo: t.titulo
-			});
-
-		});
-
-		res.json(tareas);
-
-	}
-	catch (error) {
-
-		res.status(500).json({
-			error: error.message,
-		});
-
-	}
+    res.json(tareas);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.delete("/:id", async (req, res) => {
+  try {
+    const result = await Tarea.collection.findOneAndDelete({ _id: req.params.id });
 
-	try {
+    if (!result) {
+      const resultObj = await Tarea.collection.findOneAndDelete({
+        _id: new mongoose.Types.ObjectId(req.params.id)
+      }).catch(() => null);
 
-		const tarea = await Tarea.findById(req.params.id);
+      if (!resultObj) {
+        return res.status(404).json({ mensaje: "Tarea no encontrada" });
+      }
+    }
 
-		if (!tarea) {
-
-			return res.status(404).json({
-				mensaje: "Tarea no encontrada",
-			});
-
-		}
-
-		
-
-		await Tarea.findByIdAndDelete(req.params.id);
-
-		res.json({
-			mensaje: "Tarea eliminada",
-		});
-
-	}
-	catch (error) {
-
-		res.status(500).json({
-			error: error.message,
-		});
-	}
+    res.json({ mensaje: "Tarea eliminada" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
-
-
-const mongoose = require("mongoose");
 
 router.put("/:id", async (req, res) => {
   try {
@@ -128,24 +72,17 @@ router.put("/:id", async (req, res) => {
       updateData.fecha_completada = null;
     }
 
-    // Intentar con ObjectId primero, si falla buscar como string
-    let tarea = null;
+    let tarea = await Tarea.collection.findOneAndUpdate(
+      { _id: id },
+      { $set: updateData },
+      { returnDocument: "after" }
+    );
 
-    const mongoose = require("mongoose");
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      tarea = await Tarea.findByIdAndUpdate(
-        id,
+    if (!tarea && mongoose.Types.ObjectId.isValid(id)) {
+      tarea = await Tarea.collection.findOneAndUpdate(
+        { _id: new mongoose.Types.ObjectId(id) },
         { $set: updateData },
-        { new: true }
-      );
-    }
-
-    // Si no encontró (ID de seed con formato raro), buscar por string
-    if (!tarea) {
-      tarea = await Tarea.findOneAndUpdate(
-        { _id: id },  // Mongoose a veces acepta esto como string directo
-        { $set: updateData },
-        { new: true }
+        { returnDocument: "after" }
       );
     }
 
@@ -160,4 +97,5 @@ router.put("/:id", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 module.exports = router;
