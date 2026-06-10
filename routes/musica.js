@@ -6,7 +6,7 @@ const CLIENT_ID = '4d39d16c';
 
 router.get('/dashboard', async (req, res) => {
   try {
-    const jamendoUrl = `https://api.jamendo.com/v3.0/tracks/?client_id=${CLIENT_ID}&format=json&limit=50&tags=lofi,chill,ambient&include=musicinfo&order=popularity_total`;
+    const jamendoUrl = `https://api.jamendo.com/v3.0/tracks/?client_id=${CLIENT_ID}&format=json&limit=50&tags=lofi+chill+ambient&include=musicinfo&order=popularity_total`;
     
     const respuesta = await axios.get(jamendoUrl);
     const pistas = respuesta.data.results;
