@@ -3,18 +3,19 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { Resend } = require('resend');
+const Brevo = require('@getbrevo/brevo');
 
-// Inicializamos Resend con tu API Key real para saltear el bloqueo de Render
-const resend = new Resend('re_2xQU7aYk_FuLSbLsuquQJK71F9WqUScuG');
+const brevoClient = Brevo.ApiClient.instance;
+brevoClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
+const emailApi = new Brevo.TransactionalEmailsApi();
 
 const transporter = {
   sendMail: async (mailOptions) => {
-    return resend.emails.send({
-      from: 'Fokuss <onboarding@resend.dev>', 
-      to: mailOptions.to,                   
+    return emailApi.sendTransacEmail({
+      sender: { name: 'Fokuss', email: 'appfokuss@gmail.com' },
+      to: [{ email: mailOptions.to }],
       subject: mailOptions.subject,
-      html: mailOptions.html || mailOptions.text
+      htmlContent: mailOptions.html || mailOptions.text,
     });
   }
 };
