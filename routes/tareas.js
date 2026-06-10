@@ -116,42 +116,29 @@ router.delete("/:id", async (req, res) => {
 
 
 router.put("/:id", async (req, res) => {
+  try {
+    const updateData = { ...req.body };
 
-	try {
+    // Si se está completando, guardar la fecha
+    if (req.body.estado === "completada") {
+      updateData.fecha_completada = new Date();
+    } else if (req.body.estado === "pendiente") {
+      updateData.fecha_completada = null;
+    }
 
-		const tarea = await Tarea.findOneAndUpdate(
+    const tarea = await Tarea.findOneAndUpdate(
+      { _id: req.params.id },
+      { $set: updateData },
+      { new: true }
+    );
 
-			{ _id: req.params.id },
+    if (!tarea) {
+      return res.status(404).json({ mensaje: "Tarea no encontrada" });
+    }
 
-			{
-				$set: req.body
-			},
-
-			{
-				new: true
-			}
-
-		);
-
-		if (!tarea) {
-
-			return res.status(404).json({
-				mensaje: "Tarea no encontrada"
-			});
-
-		}
-
-		res.json(tarea);
-
-	}
-	catch (error) {
-
-		res.status(500).json({
-			error: error.message
-		});
-
-	}
-
+    res.json(tarea);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
-
 module.exports = router;
