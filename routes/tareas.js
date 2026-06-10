@@ -115,19 +115,26 @@ router.delete("/:id", async (req, res) => {
 });
 
 
+const mongoose = require("mongoose");
+
 router.put("/:id", async (req, res) => {
   try {
-    const updateData = { ...req.body };
+    const id = req.params.id;
 
-    // Si se está completando, guardar la fecha
+    // Verificar que el ID sea válido antes de buscar
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ mensaje: "ID inválido" });
+    }
+
+    const updateData = { ...req.body };
     if (req.body.estado === "completada") {
       updateData.fecha_completada = new Date();
     } else if (req.body.estado === "pendiente") {
       updateData.fecha_completada = null;
     }
 
-    const tarea = await Tarea.findOneAndUpdate(
-      { _id: req.params.id },
+    const tarea = await Tarea.findByIdAndUpdate(
+      id,         
       { $set: updateData },
       { new: true }
     );
@@ -137,6 +144,7 @@ router.put("/:id", async (req, res) => {
     }
 
     res.json(tarea);
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
