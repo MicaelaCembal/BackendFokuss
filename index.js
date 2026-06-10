@@ -12,6 +12,7 @@ const amigosRoutes = require("./routes/amigos");
 const rachasCompartidasRoutes = require("./routes/rachasCompartidas");
 const recompensasRoutes = require("./routes/recompensas");
 const musicaRoutes = require("./routes/musica");
+const materiasRoutes = require('./routes/materias');
 const { iniciarCron } = require("./jobs/notificacionesCron");
 
 const app = express();
@@ -33,6 +34,7 @@ app.use("/api/recompensas", recompensasRoutes);
 app.use("/api/amigos", amigosRoutes);
 app.use("/api/rachas-compartidas", rachasCompartidasRoutes);
 app.use("/api/musica", musicaRoutes);
+app.use('/api/materias', materiasRoutes);
 
 const mongoURI = process.env.MONGODB_URI;
 
@@ -51,6 +53,8 @@ app.get('/api/status', (req, res) => {
 		mensaje: 'Backend funcionando',
 	});
 });
+
+
 
 const PORT = process.env.PORT || 3000;
 
