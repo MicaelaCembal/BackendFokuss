@@ -1,251 +1,315 @@
 const express = require('express');
 const router = express.Router();
-
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { Resend } = require('resend');
 
-// ─── Registro ────────────────────────────────────────────────────────────────
+// Inicializamos Resend con tu API Key real para saltear el bloqueo de Render
+const resend = new Resend('re_2xQU7aYk_FuLSbLsuquQJK71F9WqUScuG');
+
+const transporter = {
+  sendMail: async (mailOptions) => {
+    return resend.emails.send({
+      from: 'Fokuss <onboarding@resend.dev>', 
+      to: mailOptions.to,                   
+      subject: mailOptions.subject,
+      html: mailOptions.html || mailOptions.text
+    });
+  }
+};
+
+// Middleware para proteger rutas con JWT
+const verificarToken = (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader) {
+            return res.status(401).json({ mensaje: 'Acceso denegado. Token requerido.' });
+        }
+
+        const token = authHeader.replace('Bearer ', '');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        
+        req.user = decoded; 
+        next();
+    } catch (error) {
+        return res.status(401).json({ mensaje: 'Token inválido o expirado.' });
+    }
+};
+
+// ─── REGISTRO ────────────────────────────────────────────────────────────────
 
 router.post('/register', async (req, res) => {
+    try {
+        const { nombre, apellido, email, password, nivel, carrera } = req.body;
 
-	try {
+        if (!nombre || !apellido || !email || !password || !nivel) {
+            return res.status(400).json({
+                mensaje: 'Faltan datos obligatorios para registrar el usuario',
+            });
+        }
 
-		const {
-			nombre,
-			apellido,
-			email,
-			password,
-			nivel,
-			carrera,
-		} = req.body;
+        const usuarioExiste = await User.findOne({ email });
 
-		if (!nombre || !apellido || !email || !password || !nivel) {
-			return res.status(400).json({
-				mensaje: 'Faltan datos obligatorios para registrar el usuario',
-			});
-		}
+        if (usuarioExiste) {
+            return res.status(400).json({
+                mensaje: 'El usuario ya existe',
+            });
+        }
 
-		const usuarioExiste = await User.findOne({ email });
+        const passwordHash = await bcrypt.hash(password, 10);
 
-		if (usuarioExiste) {
-			return res.status(400).json({
-				mensaje: 'El usuario ya existe',
-			});
-		}
+        const nuevoUsuario = new User({
+            nombre,
+            apellido,
+            email,
+            password: passwordHash,
+            nivel,
+            carrera: nivel === 'universitario' ? carrera : '',
+        });
 
-		const nuevoUsuario = new User({
-			nombre,
-			apellido,
-			email,
-			password,
-			nivel,
-			carrera: nivel === 'universitario' ? carrera : '',
-		});
+        await nuevoUsuario.save();
 
-		await nuevoUsuario.save();
+        const usuarioRespuesta = nuevoUsuario.toObject();
+        delete usuarioRespuesta.password;
 
-		res.json({
-			mensaje: 'Usuario creado correctamente',
-			usuario: nuevoUsuario,
-		});
+        res.json({
+            mensaje: 'Usuario creado correctamente',
+            usuario: usuarioRespuesta,
+        });
 
-	} catch (error) {
-
-		console.log(error);
-
-		res.status(500).json({
-			mensaje: 'Error del servidor',
-		});
-
-	}
-
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ mensaje: 'Error del servidor' });
+    }
 });
-
-// ─── Login ───────────────────────────────────────────────────────────────────
+// ─── LOGIN (SOLUCIONADO CON COLECCIÓN NATIVA) ─────────────────────────────
 
 router.post('/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
 
-	try {
+        // Buscamos directo en la coleccion nativa sin pasar por los filtros de Mongoose
+        const usuario = await User.collection.findOne({ email: email.trim() });
 
-		const { email, password } = req.body;
+        if (!usuario) {
+            return res.status(400).json({
+                mensaje: 'Usuario no encontrado',
+            });
+        }
 
-		const usuario = await User.findOne({ email });
+        // Comparamos la contraseña enviada con el hash real de Atlas
+        const passwordCorrecta = await bcrypt.compare(password, usuario.password);
 
-		if (!usuario) {
-			return res.status(400).json({
-				mensaje: 'Usuario no encontrado',
-			});
-		}
+        if (!passwordCorrecta) {
+            return res.status(400).json({
+                mensaje: 'Contraseña incorrecta',
+            });
+        }
 
-		if (usuario.password !== password) {
-			return res.status(400).json({
-				mensaje: 'Contraseña incorrecta',
-			});
-		}
+        // Generamos el token JWT
+        const token = jwt.sign(
+            { id: usuario._id, email: usuario.email },
+            process.env.JWT_SECRET,
+            { expiresIn: '30d' }
+        );
 
-		res.json({
-			mensaje: 'Login exitoso',
-			usuario,
-		});
+        // Limpiamos la password antes de responder
+        const usuarioSinPassword = { ...usuario };
+        delete usuarioSinPassword.password;
 
-	} catch (error) {
+        res.json({
+            mensaje: 'Login exitoso',
+            token,
+            usuario: usuarioSinPassword,
+        });
 
-		console.log(error);
-
-		res.status(500).json({
-			mensaje: 'Error del servidor',
-		});
-
-	}
-
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ mensaje: 'Error del servidor' });
+    }
 });
 
-// ─── Obtener todos los usuarios ───────────────────────────────────────────────
+router.post('/reset-password', async (req, res) => {
+    try {
+        const { token, password } = req.body;
 
-router.get('/users', async (req, res) => {
+        if (!token || !password) {
+            return res.status(400).json({ mensaje: 'Faltan datos obligatorios.' });
+        }
 
-	try {
+        const codigoLimpio = token.trim();
 
-		const usuarios = await User.find({});
+        // Buscamos el usuario que tenga ese código y que no haya expirado
+        const usuario = await User.collection.findOne({
+            resetCodigo: codigoLimpio,
+            resetExpira: { $gt: new Date() }
+        });
 
-		res.json(usuarios);
+        if (!usuario) {
+            return res.status(400).json({ 
+                mensaje: 'El código es inválido o ya expiró.' 
+            });
+        }
 
-	} catch (error) {
+        const nuevaPasswordHash = await bcrypt.hash(password, 10);
 
-		console.log(error);
+        // Actualizamos la password y borramos el código usado
+        await User.collection.updateOne(
+            { _id: usuario._id },
+            { 
+                $set: { password: nuevaPasswordHash },
+                $unset: { resetCodigo: '', resetExpira: '' }
+            }
+        );
 
-		res.status(500).json({
-			mensaje: 'Error obteniendo usuarios',
-		});
+        res.json({ mensaje: 'Contraseña actualizada con éxito.' });
 
-	}
-
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ mensaje: 'Error del servidor.' });
+    }
 });
 
-// ─── Obtener usuario por ID ───────────────────────────────────────────────────
 
-router.get('/users/:id', async (req, res) => {
+router.post('/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
 
-	try {
+        const usuario = await User.findOne({ email });
+        if (!usuario) {
+            return res.status(404).json({
+                mensaje: 'No existe ningún usuario registrado con ese email.',
+            });
+        }
 
-		const usuario = await User.findById(req.params.id);
+        // Código numérico de 6 dígitos, mucho más simple de copiar
+        const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiracion = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
 
-		if (!usuario) {
-			return res.status(404).json({
-				mensaje: 'Usuario no encontrado',
-			});
-		}
+        // Guardamos el código y su expiración en el usuario
+        await User.collection.updateOne(
+            { _id: usuario._id },
+            { $set: { resetCodigo: codigo, resetExpira: expiracion } }
+        );
 
-		res.json(usuario);
+        const mailOptions = {
+            to: usuario.email,
+            subject: 'Código de Recuperación - FOKUSS',
+            html: `
+                <div style="font-family: sans-serif; padding: 20px; max-width: 500px; border: 1px solid #ddd; border-radius: 8px;">
+                    <h1 style="color: #0057C8; text-align: center;">FOKUSS</h1>
+                    <p>Hola <strong>${usuario.nombre || 'Usuario'}</strong>,</p>
+                    <p>Tu código para restablecer la contraseña es:</p>
+                    <div style="background-color: #F2F2F2; padding: 15px; text-align: center; font-size: 36px; font-family: monospace; letter-spacing: 8px; border-radius: 6px; border: 1px dashed #B96CFF; font-weight: bold; margin: 20px 0;">
+                        ${codigo}
+                    </div>
+                    <p style="font-size: 12px; color: #666;">Este código expira en 15 minutos.</p>
+                </div>
+            `,
+        };
 
-	} catch (error) {
+        await transporter.sendMail(mailOptions);
+        res.json({ mensaje: 'Correo de recuperación enviado correctamente.' });
 
-		console.log(error);
-
-		res.status(500).json({
-			mensaje: 'Error obteniendo usuario',
-		});
-
-	}
-
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ mensaje: 'Error al enviar el correo de recuperación' });
+    }
 });
 
-// ─── Actualizar usuario ───────────────────────────────────────────────────────
+// ─── OBTENER TODOS LOS USUARIOS (Ruta Protegida) ──────────────────────────────
 
-router.put('/users/:id', async (req, res) => {
-
-	try {
-
-		const usuarioActualizado = await User.findByIdAndUpdate(
-			req.params.id,
-			req.body,
-			{ new: true }
-		);
-
-		if (!usuarioActualizado) {
-			return res.status(404).json({
-				mensaje: 'Usuario no encontrado',
-			});
-		}
-
-		res.json({
-			mensaje: 'Usuario actualizado',
-			usuario: usuarioActualizado,
-		});
-
-	} catch (error) {
-
-		console.log(error);
-
-		res.status(500).json({
-			mensaje: 'Error actualizando usuario',
-		});
-
-	}
-
+router.get('/users', verificarToken, async (req, res) => {
+    try {
+        const usuarios = await User.find({}).select('-password');
+        res.json(usuarios);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ mensaje: 'Error obteniendo usuarios' });
+    }
 });
 
-// ─── Eliminar usuario ─────────────────────────────────────────────────────────
+// ─── OBTENER USUARIO POR ID (Ruta Protegida) ──────────────────────────────────
 
-router.delete('/users/:id', async (req, res) => {
+router.get('/users/:id', verificarToken, async (req, res) => {
+    try {
+        const usuario = await User.findById(req.params.id).select('-password');
 
-	try {
+        if (!usuario) {
+            return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+        }
 
-		const usuarioEliminado = await User.findByIdAndDelete(req.params.id);
-
-		if (!usuarioEliminado) {
-			return res.status(404).json({
-				mensaje: 'Usuario no encontrado',
-			});
-		}
-
-		res.json({
-			mensaje: 'Usuario eliminado correctamente',
-		});
-
-	} catch (error) {
-
-		console.log(error);
-
-		res.status(500).json({
-			mensaje: 'Error eliminando usuario',
-		});
-
-	}
-
+        res.json(usuario);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ mensaje: 'Error obteniendo usuario' });
+    }
 });
 
-// ─── Guardar Expo Push Token ──────────────────────────────────────────────────
-// El frontend llama a este endpoint una vez que el usuario inicia sesión,
-// para que el backend pueda mandarle notificaciones push aunque la app esté cerrada.
+// ─── ACTUALIZAR USUARIO (Ruta Protegida) ──────────────────────────────────────
+
+router.put('/users/:id', verificarToken, async (req, res) => {
+    try {
+        if (req.body.password) {
+            req.body.password = await bcrypt.hash(req.body.password, 10);
+        }
+
+        const usuarioActualizado = await User.findByIdAndUpdate(
+            req.params.id,
+            req.body,
+            { new: true }
+        ).select('-password');
+
+        if (!usuarioActualizado) {
+            return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+        }
+
+        res.json({
+            mensaje: 'Usuario actualizado',
+            usuario: usuarioActualizado,
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ mensaje: 'Error actualizando usuario' });
+    }
+});
+
+// ─── ELIMINAR USUARIO (Ruta Protegida) ────────────────────────────────────────
+
+router.delete('/users/:id', verificarToken, async (req, res) => {
+    try {
+        const usuarioEliminado = await User.findByIdAndDelete(req.params.id);
+
+        if (!usuarioEliminado) {
+            return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+        }
+
+        res.json({ mensaje: 'Usuario eliminado correctamente' });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ mensaje: 'Error eliminando usuario' });
+    }
+});
+
+// ─── GUARDAR EXPO PUSH TOKEN ──────────────────────────────────────────────────
 
 router.post('/push-token', async (req, res) => {
+    try {
+        const { userId, token } = req.body;
 
-	try {
+        if (!userId || !token) {
+            return res.status(400).json({ mensaje: 'Faltan userId o token' });
+        }
 
-		const { userId, token } = req.body;
+        await User.findByIdAndUpdate(userId, { expoPushToken: token });
 
-		if (!userId || !token) {
-			return res.status(400).json({
-				mensaje: 'Faltan userId o token',
-			});
-		}
-
-		await User.findByIdAndUpdate(userId, { expoPushToken: token });
-
-		res.json({
-			mensaje: 'Push token guardado correctamente',
-		});
-
-	} catch (error) {
-
-		console.log(error);
-
-		res.status(500).json({
-			mensaje: 'Error guardando push token',
-		});
-
-	}
-
+        res.json({ mensaje: 'Push token guardado correctamente' });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ mensaje: 'Error guardando push token' });
+    }
 });
 
 module.exports = router;
