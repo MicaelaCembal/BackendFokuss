@@ -121,11 +121,6 @@ router.put("/:id", async (req, res) => {
   try {
     const id = req.params.id;
 
-    // Verificar que el ID sea válido antes de buscar
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ mensaje: "ID inválido" });
-    }
-
     const updateData = { ...req.body };
     if (req.body.estado === "completada") {
       updateData.fecha_completada = new Date();
@@ -133,11 +128,26 @@ router.put("/:id", async (req, res) => {
       updateData.fecha_completada = null;
     }
 
-    const tarea = await Tarea.findByIdAndUpdate(
-      id,         
-      { $set: updateData },
-      { new: true }
-    );
+    // Intentar con ObjectId primero, si falla buscar como string
+    let tarea = null;
+
+    const mongoose = require("mongoose");
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      tarea = await Tarea.findByIdAndUpdate(
+        id,
+        { $set: updateData },
+        { new: true }
+      );
+    }
+
+    // Si no encontró (ID de seed con formato raro), buscar por string
+    if (!tarea) {
+      tarea = await Tarea.findOneAndUpdate(
+        { _id: id },  // Mongoose a veces acepta esto como string directo
+        { $set: updateData },
+        { new: true }
+      );
+    }
 
     if (!tarea) {
       return res.status(404).json({ mensaje: "Tarea no encontrada" });
@@ -146,6 +156,7 @@ router.put("/:id", async (req, res) => {
     res.json(tarea);
 
   } catch (error) {
+    console.log("Error PUT tarea:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
