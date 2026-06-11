@@ -3,11 +3,10 @@ const router = express.Router();
 const MapaMental = require('../models/MapaMental');
 const Groq = require('groq-sdk');
 const multer = require('multer');
+const PDFParser = require('pdf2json');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const upload = multer({ storage: multer.memoryStorage() });
-
-const PDFParser = require('pdf2json');
 
 async function extraerTextoPDF(buffer) {
   return new Promise((resolve, reject) => {
@@ -71,6 +70,7 @@ Reglas:
 - nivel 2: entre 1 y 3 subnodos por rama
 - Los colores de nivel 1 deben ser distintos entre sí: usá #F97316, #22C55E, #3B82F6, #A855F7, #EF4444, #EAB308
 - Los subnodos del mismo padre heredan el color del padre pero más claro
+- No agregues ningún texto fuera del JSON
 
 Texto del PDF:
 ${textoPDF}
@@ -79,11 +79,18 @@ ${textoPDF}
     const response = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
-      temperature: 0.5,
+      temperature: 0.3,
     });
 
     let resultado = response.choices[0].message.content;
     resultado = resultado.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    const jsonMatch = resultado.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.log('Groq no devolvió JSON:', resultado);
+      return res.status(500).json({ error: 'No se pudo generar el mapa. Intentá con otro PDF.' });
+    }
+    resultado = jsonMatch[0];
 
     const estructura = JSON.parse(resultado);
 
