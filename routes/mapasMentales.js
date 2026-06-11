@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const MapaMental = require('../models/MapaMental');
-const { GoogleGenAI } = require('@google/genai');
+const Groq = require('groq-sdk');
 const multer = require('multer');
+const pdfParse = require('pdf-parse');
 
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const upload = multer({ storage: multer.memoryStorage() });
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 router.get('/:usuarioId', async (req, res) => {
   try {
@@ -30,10 +31,13 @@ router.post('/generar-pdf', upload.single('pdf'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No llegó ningún PDF' });
 
     const { usuario_id } = req.body;
-    const pdfBase64 = req.file.buffer.toString('base64');
+
+    // Extraer texto del PDF
+    const pdfData = await pdfParse(req.file.buffer);
+    const textoPDF = pdfData.text.slice(0, 8000); // límite para no superar tokens
 
     const prompt = `
-Analizá este PDF y extraé los conceptos principales para armar un mapa mental de estudio.
+Analizá el siguiente texto extraído de un PDF y extraé los conceptos principales para armar un mapa mental de estudio.
 Detectá automáticamente la materia o tema principal.
 
 Devolvé ÚNICAMENTE un objeto JSON puro sin markdown con este formato exacto:
@@ -51,37 +55,22 @@ Reglas:
 - nivel 0: un solo nodo central
 - nivel 1: entre 3 y 6 ramas principales
 - nivel 2: entre 1 y 3 subnodos por rama
-- Los colores de nivel 1 deben ser distintos entre sí
+- Los colores de nivel 1 deben ser distintos entre sí: usá #F97316, #22C55E, #3B82F6, #A855F7, #EF4444, #EAB308
 - Los subnodos del mismo padre heredan el color del padre pero más claro
+
+Texto del PDF:
+${textoPDF}
 `;
 
-    let response;
-    try {
-      response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: [{
-          role: 'user',
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } }
-          ]
-        }]
-      });
-    } catch (err) {
-      console.log('Gemini 2.5 ocupado, usando 2.0...');
-      response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: [{
-          role: 'user',
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } }
-          ]
-        }]
-      });
-    }
+    const response = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.5,
+    });
 
-    let resultado = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
+    let resultado = response.choices[0].message.content;
+    resultado = resultado.replace(/```json/g, '').replace(/```/g, '').trim();
+
     const estructura = JSON.parse(resultado);
 
     const nuevoMapa = new MapaMental({
