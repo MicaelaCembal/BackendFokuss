@@ -3,21 +3,23 @@ const router = express.Router();
 const MapaMental = require('../models/MapaMental');
 const Groq = require('groq-sdk');
 const multer = require('multer');
+const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const upload = multer({ storage: multer.memoryStorage() });
 
-const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
-
-const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(req.file.buffer) });
-const pdf = await loadingTask.promise;
-let textoPDF = '';
-for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
-  const page = await pdf.getPage(i);
-  const content = await page.getTextContent();
-  textoPDF += content.items.map((item) => item.str).join(' ') + '\n';
+async function extraerTextoPDF(buffer) {
+  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
+  const pdf = await loadingTask.promise;
+  let texto = '';
+  for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    texto += content.items.map((item) => item.str).join(' ') + '\n';
+  }
+  return texto.slice(0, 8000);
 }
-textoPDF = textoPDF.slice(0, 8000);
+
 router.get('/:usuarioId', async (req, res) => {
   try {
     const mapas = await MapaMental.find({ usuario_id: req.params.usuarioId }).sort({ fecha_creacion: -1 });
@@ -41,10 +43,7 @@ router.post('/generar-pdf', upload.single('pdf'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No llegó ningún PDF' });
 
     const { usuario_id } = req.body;
-
-    // Extraer texto del PDF
-    const pdfData = await pdfParse(req.file.buffer);
-    const textoPDF = pdfData.text.slice(0, 8000); // límite para no superar tokens
+    const textoPDF = await extraerTextoPDF(req.file.buffer);
 
     const prompt = `
 Analizá el siguiente texto extraído de un PDF y extraé los conceptos principales para armar un mapa mental de estudio.
