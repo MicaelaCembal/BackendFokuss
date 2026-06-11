@@ -3,7 +3,6 @@ const router = express.Router();
 const Flashcard = require("../models/Flashcard");
 const Groq = require("groq-sdk");
 const multer = require("multer");
-const pdfParse = require("pdf-parse");
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const upload = multer({ storage: multer.memoryStorage() });
