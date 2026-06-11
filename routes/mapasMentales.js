@@ -3,21 +3,26 @@ const router = express.Router();
 const MapaMental = require('../models/MapaMental');
 const Groq = require('groq-sdk');
 const multer = require('multer');
-const pdfjsLib = require('pdfjs-dist');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const upload = multer({ storage: multer.memoryStorage() });
 
+const PDFParser = require('pdf2json');
+
 async function extraerTextoPDF(buffer) {
-  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
-  const pdf = await loadingTask.promise;
-  let texto = '';
-  for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    texto += content.items.map((item) => item.str).join(' ') + '\n';
-  }
-  return texto.slice(0, 8000);
+  return new Promise((resolve, reject) => {
+    const pdfParser = new PDFParser();
+    pdfParser.on('pdfParser_dataReady', (data) => {
+      const texto = data.Pages
+        .flatMap(page => page.Texts)
+        .map(t => decodeURIComponent(t.R.map(r => r.T).join('')))
+        .join(' ')
+        .slice(0, 8000);
+      resolve(texto);
+    });
+    pdfParser.on('pdfParser_dataError', reject);
+    pdfParser.parseBuffer(buffer);
+  });
 }
 
 router.get('/:usuarioId', async (req, res) => {
