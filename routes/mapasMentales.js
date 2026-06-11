@@ -3,11 +3,21 @@ const router = express.Router();
 const MapaMental = require('../models/MapaMental');
 const Groq = require('groq-sdk');
 const multer = require('multer');
-const pdfParse = require('pdf-parse/lib/pdf-parse.js');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const upload = multer({ storage: multer.memoryStorage() });
 
+const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+
+const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(req.file.buffer) });
+const pdf = await loadingTask.promise;
+let textoPDF = '';
+for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
+  const page = await pdf.getPage(i);
+  const content = await page.getTextContent();
+  textoPDF += content.items.map((item) => item.str).join(' ') + '\n';
+}
+textoPDF = textoPDF.slice(0, 8000);
 router.get('/:usuarioId', async (req, res) => {
   try {
     const mapas = await MapaMental.find({ usuario_id: req.params.usuarioId }).sort({ fecha_creacion: -1 });
