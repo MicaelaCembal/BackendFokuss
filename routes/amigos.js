@@ -57,22 +57,33 @@ router.get('/:userId/sugerencias', async (req, res) => {
 router.get('/:userId/buscar', async (req, res) => {
     try {
         const { q } = req.query;
-        const normalizar = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        if (!q) return res.json([]);
+
+        const normalizar = (str) =>
+            (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         const qNormalizado = normalizar(q);
 
-        const todos = await usuariosCollection().find({}).toArray();
+        // Excluimos al propio usuario de los resultados
+        const todos = await usuariosCollection()
+            .find({ _id: { $ne: req.params.userId } })
+            .toArray();
+
         const resultados = todos.filter(u => {
-            const nombre = normalizar(u.nombre || '');
-            const apellido = normalizar(u.apellido || '');
-            const email = normalizar(u.email || '');
-            return nombre.includes(qNormalizado) || apellido.includes(qNormalizado) || email.includes(qNormalizado);
+            const nombre = normalizar(u.nombre);
+            const apellido = normalizar(u.apellido);
+            const email = normalizar(u.email);
+            return (
+                nombre.includes(qNormalizado) ||
+                apellido.includes(qNormalizado) ||
+                email.includes(qNormalizado)
+            );
         });
 
         res.json(resultados);
     } catch (error) {
         res.status(500).json({ mensaje: 'Error buscando usuarios' });
     }
-});
+});1111111111
 
 // POST enviar solicitud de amistad
 router.post('/:userId/solicitud', async (req, res) => {
