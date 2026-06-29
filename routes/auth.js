@@ -229,17 +229,28 @@ router.put('/users/:id', async (req, res) => {
         }
 
         const { ObjectId } = require('mongodb');
-        let query;
-        try { query = { _id: new ObjectId(req.params.id) }; }
-        catch { query = { _id: req.params.id }; }
+        const opts = { returnDocument: 'after' };
+        let doc = null;
 
-        const usuarioActualizado = await User.collection.findOneAndUpdate(
-            query,
-            { $set: req.body },
-            { returnDocument: 'after' }
-        );
+        // Intentar con ObjectId
+        try {
+            const r = await User.collection.findOneAndUpdate(
+                { _id: new ObjectId(req.params.id) },
+                { $set: req.body },
+                opts
+            );
+            doc = r?.value ?? r ?? null;
+        } catch (_) {}
 
-        const doc = usuarioActualizado?.value ?? usuarioActualizado;
+        // Si no encontró, intentar con string plano
+        if (!doc) {
+            const r = await User.collection.findOneAndUpdate(
+                { _id: req.params.id },
+                { $set: req.body },
+                opts
+            );
+            doc = r?.value ?? r ?? null;
+        }
 
         if (!doc) {
             return res.status(404).json({ mensaje: 'Usuario no encontrado' });
