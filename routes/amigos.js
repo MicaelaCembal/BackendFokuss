@@ -64,9 +64,14 @@ router.get('/:userId/buscar', async (req, res) => {
         const qNormalizado = normalizar(q);
 
         // Excluimos al propio usuario de los resultados
-        const todos = await usuariosCollection()
-            .find({ _id: { $ne: req.params.userId } })
-            .toArray();
+        const usuarioActual = await usuariosCollection().findOne({ _id: req.params.userId });
+const bloqueados = usuarioActual?.bloqueados || [];
+
+const todos = await usuariosCollection()
+    .find({ _id: { $ne: req.params.userId, $nin: bloqueados } })
+    .toArray();
+
+const resultados2 = resultados.filter(u => !(u.bloqueados || []).includes(req.params.userId));
 
         const resultados = todos.filter(u => {
             const nombre = normalizar(u.nombre);
@@ -79,7 +84,7 @@ router.get('/:userId/buscar', async (req, res) => {
             );
         });
 
-        res.json(resultados);
+        res.json(resultados2);
     } catch (error) {
         res.status(500).json({ mensaje: 'Error buscando usuarios' });
     }

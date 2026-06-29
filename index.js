@@ -16,6 +16,7 @@ const materiasRoutes = require('./routes/materias');
 const { iniciarCron } = require("./jobs/notificacionesCron");
 const mapasMentalesRoutes = require('./routes/mapasMentales');
 
+
 const app = express();
 
 app.use(cors());
@@ -37,6 +38,7 @@ app.use("/api/rachas-compartidas", rachasCompartidasRoutes);
 app.use("/api/musica", musicaRoutes);
 app.use('/api/materias', materiasRoutes);
 app.use('/api/mapas-mentales', mapasMentalesRoutes);
+app.use('/api/bloqueos', require('./routes/bloqueos'));
 const mongoURI = process.env.MONGODB_URI;
 
 mongoose.connect(mongoURI)
