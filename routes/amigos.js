@@ -63,17 +63,15 @@ router.get('/:userId/buscar', async (req, res) => {
             (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         const qNormalizado = normalizar(q);
 
-        // Excluimos al propio usuario de los resultados
         const usuarioActual = await usuariosCollection().findOne({ _id: req.params.userId });
-const bloqueados = usuarioActual?.bloqueados || [];
+        const bloqueados = usuarioActual?.bloqueados || [];
 
-const todos = await usuariosCollection()
-    .find({ _id: { $ne: req.params.userId, $nin: bloqueados } })
-    .toArray();
-
-const resultados2 = resultados.filter(u => !(u.bloqueados || []).includes(req.params.userId));
+        const todos = await usuariosCollection()
+            .find({ _id: { $ne: req.params.userId, $nin: bloqueados } })
+            .toArray();
 
         const resultados = todos.filter(u => {
+            if ((u.bloqueados || []).includes(req.params.userId)) return false;
             const nombre = normalizar(u.nombre);
             const apellido = normalizar(u.apellido);
             const email = normalizar(u.email);
@@ -84,11 +82,11 @@ const resultados2 = resultados.filter(u => !(u.bloqueados || []).includes(req.pa
             );
         });
 
-        res.json(resultados2);
+        res.json(resultados);
     } catch (error) {
         res.status(500).json({ mensaje: 'Error buscando usuarios' });
     }
-});1111111111
+});
 
 // POST enviar solicitud de amistad
 router.post('/:userId/solicitud', async (req, res) => {

@@ -228,20 +228,25 @@ router.put('/users/:id', async (req, res) => {
             req.body.password = await bcrypt.hash(req.body.password, 10);
         }
 
-        const usuarioActualizado = await User.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true }
-        ).select('-password');
+        const { ObjectId } = require('mongodb');
+        let query;
+        try { query = { _id: new ObjectId(req.params.id) }; }
+        catch { query = { _id: req.params.id }; }
 
-        if (!usuarioActualizado) {
+        const usuarioActualizado = await User.collection.findOneAndUpdate(
+            query,
+            { $set: req.body },
+            { returnDocument: 'after' }
+        );
+
+        const doc = usuarioActualizado?.value ?? usuarioActualizado;
+
+        if (!doc) {
             return res.status(404).json({ mensaje: 'Usuario no encontrado' });
         }
 
-        res.json({
-            mensaje: 'Usuario actualizado',
-            usuario: usuarioActualizado,
-        });
+        const { password: _, ...sinPassword } = doc;
+        res.json({ mensaje: 'Usuario actualizado', usuario: sinPassword });
     } catch (error) {
         console.log(error);
         res.status(500).json({ mensaje: 'Error actualizando usuario' });
