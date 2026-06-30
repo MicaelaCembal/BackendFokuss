@@ -51,15 +51,20 @@ async function main() {
   // Distribuir horas variadas para que algunos tengan más recompensas que otros
   const horasMin = [180, 300, 480, 600, 900, 1200, 1500, 1800, 2400, 3000];
   const rachasInd = [2, 5, 7, 12, 14, 21, 30, 45, 3, 8];
+  const carreras = [
+    "Ingeniería en Sistemas", "Medicina", "Derecho", "Diseño Gráfico",
+    "Administración de Empresas", "Psicología", "Arquitectura", "Contador Público",
+    "Tecnicatura en Programación", "Biología", "Estudiante secundario", "Comunicación Social",
+  ];
 
   for (let i = 0; i < pool.length; i++) {
     const u = pool[i];
-    await usuarios.updateOne({ _id: u._id }, {
-      $set: {
-        minutos_totales_estudio: horasMin[i % horasMin.length],
-        racha_actual: rachasInd[i % rachasInd.length],
-      }
-    });
+    const update = {
+      minutos_totales_estudio: horasMin[i % horasMin.length],
+      racha_actual: rachasInd[i % rachasInd.length],
+    };
+    if (!u.carrera) update.carrera = carreras[i % carreras.length];
+    await usuarios.updateOne({ _id: u._id }, { $set: update });
   }
   console.log("\nHoras y rachas individuales asignadas.");
 
