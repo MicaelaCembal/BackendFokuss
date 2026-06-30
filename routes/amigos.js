@@ -4,13 +4,23 @@ const mongoose = require('mongoose');
 
 const usuariosCollection = () => mongoose.connection.db.collection('Usuarios');
 
+const toOid = (id) => {
+    try { return new mongoose.Types.ObjectId(id); } catch { return id; }
+};
+const findUsuario = (id) => usuariosCollection().findOne({
+    $or: [{ _id: toOid(id) }, { _id: id }]
+});
+const findUsuarios = (ids) => usuariosCollection().find({
+    $or: [{ _id: { $in: ids.map(toOid) } }, { _id: { $in: ids } }]
+}).toArray();
+
 // GET mis amigos
 router.get('/:userId', async (req, res) => {
     try {
-        const usuario = await usuariosCollection().findOne({ _id: req.params.userId });
+        const usuario = await findUsuario(req.params.userId);
         if (!usuario) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
 
-        const amigos = await usuariosCollection().find({ _id: { $in: usuario.amigos || [] } }).toArray();
+        const amigos = await findUsuarios(usuario.amigos || []);
         res.json(amigos);
     } catch (error) {
         res.status(500).json({ mensaje: 'Error obteniendo amigos' });
@@ -20,7 +30,7 @@ router.get('/:userId', async (req, res) => {
 // GET sugerencias (amigos de amigos + random)
 router.get('/:userId/sugerencias', async (req, res) => {
     try {
-        const usuario = await usuariosCollection().findOne({ _id: req.params.userId });
+        const usuario = await findUsuario(req.params.userId);
         if (!usuario) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
 
         const amigosIds = usuario.amigos || [];
@@ -28,7 +38,7 @@ router.get('/:userId/sugerencias', async (req, res) => {
 
         const amigosDeAmigos = [];
         for (const amigoId of amigosIds) {
-            const amigo = await usuariosCollection().findOne({ _id: amigoId });
+            const amigo = await findUsuario(amigoId);
             const susAmigos = amigo?.amigos || [];
             for (const id of susAmigos) {
                 if (!excluir.includes(id) && !amigosDeAmigos.includes(id)) {
@@ -37,9 +47,7 @@ router.get('/:userId/sugerencias', async (req, res) => {
             }
         }
 
-        const sugerenciasAmigosDeAmigos = await usuariosCollection().find({
-            _id: { $in: amigosDeAmigos }
-        }).toArray();
+        const sugerenciasAmigosDeAmigos = await findUsuarios(amigosDeAmigos);
 
         const yaIncluidos = [...excluir, ...amigosDeAmigos];
         const random = await usuariosCollection().find({
@@ -63,7 +71,7 @@ router.get('/:userId/buscar', async (req, res) => {
             (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         const qNormalizado = normalizar(q);
 
-        const usuarioActual = await usuariosCollection().findOne({ _id: req.params.userId });
+        const usuarioActual = await findUsuario(req.params.userId);
         const bloqueados = usuarioActual?.bloqueados || [];
 
         const todos = await usuariosCollection()
@@ -92,8 +100,8 @@ router.get('/:userId/buscar', async (req, res) => {
 router.post('/:userId/solicitud', async (req, res) => {
     try {
         const { amigoId } = req.body;
-        const usuario = await usuariosCollection().findOne({ _id: req.params.userId });
-        const amigo = await usuariosCollection().findOne({ _id: amigoId });
+        const usuario = await findUsuario(req.params.userId);
+        const amigo = await findUsuario(amigoId);
 
         if (!usuario || !amigo) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
 
@@ -121,13 +129,13 @@ router.post('/:userId/solicitud', async (req, res) => {
 router.post('/:userId/aceptar', async (req, res) => {
     try {
         const { amigoId } = req.body;
-        const usuario = await usuariosCollection().findOne({ _id: req.params.userId });
+        const usuario = await findUsuario(req.params.userId);
         if (!usuario) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
 
         const amigos = usuario.amigos || [];
         if (!amigos.includes(amigoId)) amigos.push(amigoId);
 
-        const amigo = await usuariosCollection().findOne({ _id: amigoId });
+        const amigo = await findUsuario(amigoId);
         const amigosDeAmigo = amigo?.amigos || [];
         if (!amigosDeAmigo.includes(req.params.userId)) amigosDeAmigo.push(req.params.userId);
 
@@ -152,7 +160,7 @@ router.post('/:userId/aceptar', async (req, res) => {
 router.post('/:userId/rechazar', async (req, res) => {
     try {
         const { amigoId } = req.body;
-        const usuario = await usuariosCollection().findOne({ _id: req.params.userId });
+        const usuario = await findUsuario(req.params.userId);
         if (!usuario) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
 
         const solicitudes = (usuario.solicitudes_pendientes || []).filter(id => id !== amigoId);
@@ -170,11 +178,11 @@ router.post('/:userId/rechazar', async (req, res) => {
 // GET solicitudes pendientes
 router.get('/:userId/solicitudes', async (req, res) => {
     try {
-        const usuario = await usuariosCollection().findOne({ _id: req.params.userId });
+        const usuario = await findUsuario(req.params.userId);
         if (!usuario) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
 
         const solicitudesIds = usuario.solicitudes_pendientes || [];
-        const solicitudes = await usuariosCollection().find({ _id: { $in: solicitudesIds } }).toArray();
+        const solicitudes = await findUsuarios(solicitudesIds);
         res.json(solicitudes);
     } catch (error) {
         res.status(500).json({ mensaje: 'Error obteniendo solicitudes' });
@@ -185,21 +193,21 @@ router.get('/:userId/solicitudes', async (req, res) => {
 router.delete('/:userId/eliminar', async (req, res) => {
     try {
         const { amigoId } = req.body;
-        const usuario = await usuariosCollection().findOne({ _id: req.params.userId });
+        const usuario = await findUsuario(req.params.userId);
         if (!usuario) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
 
         // Eliminar de los dos lados
         const amigos = (usuario.amigos || []).filter(id => id !== amigoId);
         await usuariosCollection().updateOne(
-            { _id: req.params.userId },
+            { $or: [{ _id: toOid(req.params.userId) }, { _id: req.params.userId }] },
             { $set: { amigos } }
         );
 
-        const amigo = await usuariosCollection().findOne({ _id: amigoId });
+        const amigo = await findUsuario(amigoId);
         if (amigo) {
             const amigosDeAmigo = (amigo.amigos || []).filter(id => id !== req.params.userId);
             await usuariosCollection().updateOne(
-                { _id: amigoId },
+                { $or: [{ _id: toOid(amigoId) }, { _id: amigoId }] },
                 { $set: { amigos: amigosDeAmigo } }
             );
         }

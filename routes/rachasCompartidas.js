@@ -5,6 +5,9 @@ const mongoose = require("mongoose");
 const col = () => mongoose.connection.db.collection("rachas_compartidas");
 const usuarios = () => mongoose.connection.db.collection("Usuarios");
 
+const toOid = (id) => { try { return new mongoose.Types.ObjectId(id); } catch { return id; } };
+const findUsuario = (id) => usuarios().findOne({ $or: [{ _id: toOid(id) }, { _id: id }] });
+
 const hoy = () => new Date().toISOString().split("T")[0];
 const ayer = () => {
     const d = new Date();
@@ -67,7 +70,7 @@ router.get("/:userId", async (req, res) => {
 
         const rachасConDatos = await Promise.all(rachas.map(async (r) => {
             const amigoId = r.usuarioA === userId ? r.usuarioB : r.usuarioA;
-            const amigo = await usuarios().findOne({ _id: amigoId });
+            const amigo = await findUsuario(amigoId);
             return { ...r, amigo };
         }));
 
@@ -127,7 +130,7 @@ router.get("/:userId/pendientes", async (req, res) => {
         }).toArray();
 
         const conDatos = await Promise.all(pendientes.map(async (r) => {
-            const amigo = await usuarios().findOne({ _id: r.usuarioA });
+            const amigo = await findUsuario(r.usuarioA);
             return { ...r, amigo };
         }));
 
