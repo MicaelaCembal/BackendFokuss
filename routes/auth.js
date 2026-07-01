@@ -42,6 +42,12 @@ router.post('/register', async (req, res) => {
 
         const passwordHash = await bcrypt.hash(password, 10);
 
+        const generarCodigo = (nombre) => {
+            const base = (nombre || 'USER').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6) || 'USER';
+            const num = Math.floor(1000 + Math.random() * 9000);
+            return `${base}#${num}`;
+        };
+
         const nuevoUsuario = new User({
             nombre,
             apellido,
@@ -49,6 +55,7 @@ router.post('/register', async (req, res) => {
             password: passwordHash,
             nivel,
             carrera: nivel === 'universitario' ? carrera : '',
+            codigo_usuario: generarCodigo(nombre),
         });
 
         await nuevoUsuario.save();

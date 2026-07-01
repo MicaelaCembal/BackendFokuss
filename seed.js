@@ -29,9 +29,20 @@ async function main() {
   }
   if (aBorrar.length > 0) await usuarios.deleteMany({ _id: { $in: aBorrar } });
 
-  // Resetear amigos y rachas
+  // Resetear amigos y rachas (eliminar duplicados dentro del array también)
   await usuarios.updateMany({}, { $set: { amigos: [] } });
   await rachas.deleteMany({});
+
+  // Limpiar arrays de amigos duplicados en todos los usuarios
+  const todosParaLimpiar = await usuarios.find({}).toArray();
+  for (const u of todosParaLimpiar) {
+    if (Array.isArray(u.amigos) && u.amigos.length > 0) {
+      const unicos = [...new Set(u.amigos)];
+      if (unicos.length !== u.amigos.length) {
+        await usuarios.updateOne({ _id: u._id }, { $set: { amigos: unicos } });
+      }
+    }
+  }
   console.log("Base limpia.\n");
 
   // ─── 2. CARGAR USUARIOS ──────────────────────────────────────────────────────
@@ -59,11 +70,17 @@ async function main() {
 
   for (let i = 0; i < pool.length; i++) {
     const u = pool[i];
+    const generarCodigo = (nombre) => {
+      const base = (nombre || 'USER').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6) || 'USER';
+      const num = Math.floor(1000 + Math.random() * 9000);
+      return `${base}#${num}`;
+    };
     const update = {
       minutos_totales_estudio: horasMin[i % horasMin.length],
       racha_actual: rachasInd[i % rachasInd.length],
     };
     if (!u.carrera) update.carrera = carreras[i % carreras.length];
+    if (!u.codigo_usuario) update.codigo_usuario = generarCodigo(u.nombre);
     await usuarios.updateOne({ _id: u._id }, { $set: update });
   }
   console.log("\nHoras y rachas individuales asignadas.");

@@ -83,10 +83,12 @@ router.get('/:userId/buscar', async (req, res) => {
             const nombre = normalizar(u.nombre);
             const apellido = normalizar(u.apellido);
             const email = normalizar(u.email);
+            const codigo = (u.codigo_usuario || '').toLowerCase();
             return (
                 nombre.includes(qNormalizado) ||
                 apellido.includes(qNormalizado) ||
-                email.includes(qNormalizado)
+                email.includes(qNormalizado) ||
+                codigo.includes(q.toLowerCase())
             );
         });
 
